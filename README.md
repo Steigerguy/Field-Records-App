@@ -61,8 +61,11 @@ then *Add to Home Screen*). It uses the same sign-in accounts as Field Records.
 
 **How it's used:** tap **📷 Take Picture** and photograph the electric meter, the gas meter
 and the dryer screen. Each photo is read by Claude and the numbers fill in
-by themselves. Type who it's for, tap **Start** or **End**, and save. The app guesses
-Start/End from the log: if that person has a job started and not ended, it picks End.
+by themselves. Type who it's for and tap **Save START** or **Save END** — that saves the
+reading. The app highlights the likely one: if that person has a job started and not
+ended, it suggests END. For clock-style electric dials, Claude reports where each pointer
+is and the app applies the usual carry rule (a pointer only counts as past a number once
+the dial to its right has passed 0).
 The **Log** tab pairs each start with its end and shows, per job and per person:
 electric and gas used (end − start, since those meters count up), and **job hours**,
 **batch count** and burner hours (the end reading, since those are zeroed at the start of

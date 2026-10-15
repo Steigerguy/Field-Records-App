@@ -152,6 +152,17 @@
   .toggle button.on-start { border-color: var(--green-light); background: rgba(74,124,63,0.35); color: #cfeec7; }
   .toggle button.on-end { border-color: var(--red); background: rgba(184,74,63,0.3); color: #f3cdc9; }
 
+  .save-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn-save {
+    padding: 18px 8px; border-radius: 6px; border: 2px solid; background: rgba(0,0,0,0.25); cursor: pointer;
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: 2px;
+  }
+  .btn-save.start { border-color: var(--green-light); color: #cfeec7; }
+  .btn-save.end   { border-color: var(--red); color: #f3cdc9; }
+  .btn-save.start.suggested { background: var(--green); color: #fff; }
+  .btn-save.end.suggested   { background: var(--red); color: #fff; }
+  .btn-save.dim { opacity: 0.55; }
+
   /* Log */
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
   .card-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.45rem; letter-spacing: 1px; color: var(--wheat-light); }
@@ -294,14 +305,6 @@
       <div class="hint" id="customer-hint"></div>
     </div>
 
-    <div class="field">
-      <span class="label">Start or end?</span>
-      <div class="toggle">
-        <button type="button" id="kind-start" onclick="setKind('start', true)">Start</button>
-        <button type="button" id="kind-end" onclick="setKind('end', true)">End</button>
-      </div>
-    </div>
-
     <span class="label" style="margin-top:4px">Numbers <span style="color:var(--muted);text-transform:none;letter-spacing:0">— filled in from the photos, fix if wrong</span></span>
     <div class="numbers">
       <div class="field"><label class="label" for="v-electric">⚡ Electric kWh</label><input type="text" inputmode="decimal" id="v-electric"></div>
@@ -318,7 +321,10 @@
       <input type="text" id="v-note" placeholder="e.g. Corn, bin 3">
     </div>
 
-    <button class="btn btn-big btn-green" id="save-btn" onclick="saveNew()">✓ Save Reading</button>
+    <div class="save-pair">
+      <button type="button" class="btn-save start" id="save-start" onclick="saveNew('start')">Save START</button>
+      <button type="button" class="btn-save end" id="save-end" onclick="saveNew('end')">Save END</button>
+    </div>
     <div class="btn-row"><button class="btn btn-ghost btn-sm" onclick="clearForm(true)">Clear form</button></div>
   </div>
 
@@ -774,7 +780,12 @@ var READ_PROMPT = [
   'This photo was taken at a farm grain dryer for record keeping. Decide what it shows and read the numbers exactly as displayed.',
   '',
   'photo_type:',
-  '- "electric_meter": an electricity meter. Put the main cumulative kWh reading in electric_kwh. For dial meters, read each dial in order; when a pointer sits between two digits use the lower digit. Ignore serial numbers, barcodes, "Kh", voltage/amp ratings and multiplier text.',
+  '- "electric_meter": an electricity meter. Ignore serial numbers, barcodes, "Rr", "Kh", voltage/amp ratings and multiplier text.',
+  '    Digital or number-wheel display: put the kWh reading in electric_kwh and set electric_dials to null.',
+  '    Clock-style dials: put one number per dial, left to right, in electric_dials: where that dial\'s pointer points,',
+  '    as a decimal on that dial\'s own printed numbers (neighbouring dials turn opposite ways, so follow the numbers printed on each dial).',
+  '    Exactly on 3 = 3.0, halfway between 3 and 4 = 3.5, just short of 3 = 2.9, between 9 and 0 = 9.5.',
+  '    Do not round or apply any reading rules; just say where each pointer is. Also put your own best kWh reading in electric_kwh.',
   '- "gas_meter": a natural gas or propane meter. Put the main cumulative index (odometer wheels or dials) in gas. Ignore small test dials, serial numbers and pressure gauges. Only include decimals if the meter shows a decimal point or marks the last wheel(s) as decimals.',
   '- "dryer_screen": the grain dryer control touch screen. Read only these labelled boxes:',
   '    job_hours: the box labelled "Job Hours" (zeroed for each job).',
@@ -792,10 +803,11 @@ var READ_PROMPT = [
 var READ_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['photo_type', 'electric_kwh', 'gas', 'job_hours', 'batches', 'burner_hours', 'dryer_hours', 'note'],
+  required: ['photo_type', 'electric_kwh', 'electric_dials', 'gas', 'job_hours', 'batches', 'burner_hours', 'dryer_hours', 'note'],
   properties: {
     photo_type:   { type: 'string', enum: ['electric_meter', 'gas_meter', 'dryer_screen', 'other'] },
     electric_kwh: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    electric_dials: { anyOf: [{ type: 'array', items: { type: 'number' } }, { type: 'null' }] },
     gas:          { anyOf: [{ type: 'number' }, { type: 'null' }] },
     job_hours:    { anyOf: [{ type: 'string' }, { type: 'null' }] },
     batches:      { anyOf: [{ type: 'number' }, { type: 'null' }] },
@@ -841,6 +853,21 @@ function readPhotoWithClaude(dataUrl) {
   });
 }
 
+// Turns pointer positions (left to right, e.g. [7.6, 3.4, 7.5, 2.95, 9.7]) into a reading.
+// A pointer that looks like it is on a number has only passed it if the dial to its right
+// has gone past 0, so each dial's digit is worked out from where the dial to its right is.
+function readDials(pos) {
+  if (!pos || pos.length < 2 || pos.some(function(p){ return typeof p !== 'number' || !(p >= 0 && p < 10); })) return null;
+  var digits = [], right = pos[pos.length - 1];          // right = true position of the dial to the right
+  digits.unshift(Math.floor(right));
+  for (var i = pos.length - 2; i >= 0; i--) {
+    var d = ((Math.round(pos[i] - right / 10) % 10) + 10) % 10;
+    digits.unshift(d);
+    right = d + right / 10;
+  }
+  return Number(digits.join(''));
+}
+
 var TYPE_TO_SLOT = { electric_meter: 'electric', gas_meter: 'gas', dryer_screen: 'dryer' };
 
 // ===================== IMAGES =====================
@@ -869,7 +896,7 @@ function prepareImage(file) {
 
 // ===================== NEW READING FORM =====================
 function blankForm() {
-  return { customer: '', kind: '', kindChosen: false, note: '',
+  return { customer: '', kind: '', note: '',
            values: { electric: '', gas: '', jobHours: '', batches: '', burnerHours: '', dryerHours: '' },
            fromPhoto: {}, photos: {}, reading: 0 };
 }
@@ -978,7 +1005,8 @@ function handleFiles(files, forcedSlot) {
         var s = slot || TYPE_TO_SLOT[res.photo_type] || tmp;
         if (tmp && tmp !== s && form.photos[tmp] && form.photos[tmp].keep === img.keep) delete form.photos[tmp];
         if (!s) { form.message = "Couldn't tell what one photo was — tap a tile to retake it."; return; }
-        var got = { electric: res.electric_kwh, gas: res.gas, jobHours: res.job_hours, batches: res.batches,
+        var dialKwh = readDials(res.electric_dials);
+        var got = { electric: dialKwh !== null ? dialKwh : res.electric_kwh, gas: res.gas, jobHours: res.job_hours, batches: res.batches,
                     burnerHours: res.burner_hours, dryerHours: res.dryer_hours };
         var any = false;
         FIELDS.forEach(function(f) {
@@ -1070,11 +1098,6 @@ function openStart(name, excludeId) {
   return open;
 }
 
-function setKind(k, chosen) {
-  form.kind = k;
-  if (chosen) form.kindChosen = true;
-  renderKind(); saveDraft();
-}
 function renderZeroHint() {
   var vals = {};
   RESETS.forEach(function(f){ vals[f] = parseField(f, form.values[f]); });
@@ -1087,25 +1110,17 @@ function renderZeroHint() {
 function renderKind() {
   var name = form.customer.trim();
   var open = name ? openStart(name) : null;
-  // Until someone taps Start/End, guess from the log: open job -> End, otherwise Start.
-  if (!form.kindChosen) form.kind = name ? (open ? 'end' : 'start') : '';
-  $('kind-start').className = form.kind === 'start' ? 'on-start' : '';
-  $('kind-end').className   = form.kind === 'end' ? 'on-end' : '';
+  // Suggest from the log: a job going for this name -> END, otherwise START.
+  form.kind = name ? (open ? 'end' : 'start') : '';
+  $('save-start').className = 'btn-save start' + (form.kind === 'start' ? ' suggested' : (form.kind ? ' dim' : ''));
+  $('save-end').className   = 'btn-save end' + (form.kind === 'end' ? ' suggested' : (form.kind ? ' dim' : ''));
   renderZeroHint();
   var hint = $('customer-hint');
   hint.className = 'hint';
   if (!name) { hint.textContent = ''; return; }
-  if (open && form.kind === 'start') {
-    hint.className = 'hint warn';
-    hint.textContent = name + ' already has a job started ' + fmtWhen(open.ts) + ' with no end yet.';
-  } else if (open) {
-    hint.textContent = 'Ends the job started ' + fmtWhen(open.ts) + '.';
-  } else if (form.kind === 'end') {
-    hint.className = 'hint warn';
-    hint.textContent = 'No start reading found for ' + name + '.';
-  } else {
-    hint.textContent = 'Starts a new drying job for ' + name + '.';
-  }
+  hint.textContent = open
+    ? name + ' has a job going since ' + fmtWhen(open.ts) + ' — when it is done, tap Save END.'
+    : 'No job going for ' + name + ' — tap Save START to begin one.';
 }
 
 function clearForm(ask) {
@@ -1115,11 +1130,15 @@ function clearForm(ask) {
   renderForm();
 }
 
-function saveNew() {
+function saveNew(kind) {
   if (form.reading > 0) { alert('Still reading photos — give it a few seconds.'); return; }
   var customer = form.customer.trim();
   if (!customer) { alert("Type who it's for."); $('v-customer').focus(); return; }
-  if (!form.kind) { alert('Tap Start or End.'); return; }
+  var open = openStart(customer);
+  if (kind === 'start' && open &&
+      !confirm(customer + ' already has a job started ' + fmtWhen(open.ts) + ' with no end.\n\nStart another one anyway?')) return;
+  if (kind === 'end' && !open &&
+      !confirm('There is no START reading for ' + customer + '.\n\nSave this as an END anyway?')) return;
   var vals = {}, bad = [];
   FIELDS.forEach(function(f) {
     var raw = form.values[f];
@@ -1130,14 +1149,14 @@ function saveNew() {
   if (bad.length) { alert('These numbers look wrong: ' + bad.map(function(f){ return FIELD_NAMES[f]; }).join(', ')); return; }
   if (FIELDS.every(function(f){ return vals[f] === null; })) { alert('Take a picture or type at least one number.'); return; }
 
-  if (form.kind === 'start') {
+  if (kind === 'start') {
     var nz = notZeroed(vals);
     if (nz.length && !confirm(capital(namesOf(nz)) + " should be 0 when a job starts, but the dryer screen wasn't zeroed.\n\n" +
         "The job's total is the END reading, so it would include the previous job.\n\n" +
         'Best: Cancel, press Zero on the dryer screen, and retake the dryer photo.\nSave anyway?')) return;
   }
-  if (form.kind === 'end') {
-    var start = openStart(customer);
+  if (kind === 'end') {
+    var start = open;
     if (start) {
       var lower = COUNTERS.filter(function(f){ return vals[f] !== null && start[f] != null && vals[f] < start[f]; });
       if (lower.length && !confirm('These are LOWER than the start reading: ' + lower.map(function(f){ return FIELD_NAMES[f]; }).join(', ') + '. Save anyway?')) return;
@@ -1145,7 +1164,7 @@ function saveNew() {
   }
 
   var reading = {
-    id: newId('r_'), ts: Date.now(), customer: customer, kind: form.kind,
+    id: newId('r_'), ts: Date.now(), customer: customer, kind: kind,
     note: form.note.trim(), by: currentUser.email, photos: {}
   };
   FIELDS.forEach(function(f){ reading[f] = vals[f]; });

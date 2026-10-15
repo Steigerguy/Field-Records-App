@@ -1,6 +1,6 @@
 // Grain Drying Service Worker (scope /drying/)
 // Bump CACHE when you deploy changes to the shell files below; old caches are deleted on activate.
-const CACHE = 'grain-drying-v1';
+const CACHE = 'grain-drying-v2';
 const SHELL = [
   '/drying/',
   '/drying/manifest.json',
