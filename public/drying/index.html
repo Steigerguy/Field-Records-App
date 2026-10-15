@@ -311,6 +311,7 @@
       <div class="field"><label class="label minor" for="v-burnerHours">Burner hours</label><input type="text" inputmode="text" placeholder="h:mm" id="v-burnerHours"></div>
       <div class="field"><label class="label minor" for="v-dryerHours">Dryer hours</label><input type="text" inputmode="text" placeholder="h:mm" id="v-dryerHours"></div>
     </div>
+    <div class="hint bad" id="zero-hint" style="margin:-6px 0 16px"></div>
 
     <div class="field">
       <label class="label" for="v-note">Note (optional)</label>
@@ -442,6 +443,13 @@ var FIELDS = ['electric', 'gas', 'jobHours', 'batches', 'burnerHours', 'dryerHou
 // Meters that keep counting up: usage = end − start.
 // Job hours, batches and burner hours are zeroed at the start of each job: usage = the end reading.
 var COUNTERS = ['electric', 'gas', 'dryerHours'];
+var RESETS = ['jobHours', 'batches', 'burnerHours'];
+// Counters that should read 0 on a START reading but don't (dryer screen wasn't zeroed).
+function notZeroed(vals) {
+  return RESETS.filter(function(f){ return vals[f] !== null && vals[f] !== undefined && vals[f] > 0; });
+}
+function namesOf(fields) { return fields.map(function(f){ return FIELD_NAMES[f]; }).join(', '); }
+function capital(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
 var FIELD_NAMES = { electric: 'electric', gas: 'gas', jobHours: 'job hours', batches: 'batches',
                     burnerHours: 'burner hours', dryerHours: 'dryer hours' };
 
@@ -1013,6 +1021,7 @@ FIELDS.forEach(function(f) {
   $('v-' + f).addEventListener('input', function() {
     form.values[f] = this.value; form.fromPhoto[f] = false;
     this.classList.remove('from-photo');
+    renderZeroHint();
     saveDraft();
   });
 });
@@ -1066,6 +1075,15 @@ function setKind(k, chosen) {
   if (chosen) form.kindChosen = true;
   renderKind(); saveDraft();
 }
+function renderZeroHint() {
+  var vals = {};
+  RESETS.forEach(function(f){ vals[f] = parseField(f, form.values[f]); });
+  var nz = form.kind === 'start' ? notZeroed(vals) : [];
+  $('zero-hint').textContent = nz.length
+    ? '⚠ ' + capital(namesOf(nz)) + ' should be 0 at the start of a job. Press Zero on the dryer screen, then retake the dryer photo.'
+    : '';
+  $('zero-hint').style.display = nz.length ? '' : 'none';
+}
 function renderKind() {
   var name = form.customer.trim();
   var open = name ? openStart(name) : null;
@@ -1073,6 +1091,7 @@ function renderKind() {
   if (!form.kindChosen) form.kind = name ? (open ? 'end' : 'start') : '';
   $('kind-start').className = form.kind === 'start' ? 'on-start' : '';
   $('kind-end').className   = form.kind === 'end' ? 'on-end' : '';
+  renderZeroHint();
   var hint = $('customer-hint');
   hint.className = 'hint';
   if (!name) { hint.textContent = ''; return; }
@@ -1111,6 +1130,12 @@ function saveNew() {
   if (bad.length) { alert('These numbers look wrong: ' + bad.map(function(f){ return FIELD_NAMES[f]; }).join(', ')); return; }
   if (FIELDS.every(function(f){ return vals[f] === null; })) { alert('Take a picture or type at least one number.'); return; }
 
+  if (form.kind === 'start') {
+    var nz = notZeroed(vals);
+    if (nz.length && !confirm(capital(namesOf(nz)) + " should be 0 when a job starts, but the dryer screen wasn't zeroed.\n\n" +
+        "The job's total is the END reading, so it would include the previous job.\n\n" +
+        'Best: Cancel, press Zero on the dryer screen, and retake the dryer photo.\nSave anyway?')) return;
+  }
   if (form.kind === 'end') {
     var start = openStart(customer);
     if (start) {
@@ -1232,6 +1257,7 @@ function renderLog() {
     var badges = '';
     if (!j.end) badges += '<span class="badge open">' + (j.superseded ? 'no end' : 'in progress') + '</span>';
     if (!j.start) badges += '<span class="badge warn">no start</span>';
+    if (j.start && notZeroed(j.start).length) badges += '<span class="badge warn">not zeroed at start</span>';
     var chips = '';
     if (j.used) {
       chips = '<div class="chips">' +
