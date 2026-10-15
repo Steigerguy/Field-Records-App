@@ -72,6 +72,12 @@ electric and gas used (end − start, since those meters count up), and **job ho
 each job). Dryer hours (lifetime) is recorded too. Hours are kept as hours:minutes, the
 way the dryer screen shows them. It exports a CSV for a spreadsheet.
 
+**Back-to-back jobs:** when starting a job, the app lists the last few END readings. Tap
+one to use it as this start (the meters haven't moved), then **Save START** — no photos
+needed. Electric, gas and dryer hours are copied; job hours, batches and burner hours are
+left blank since they get zeroed on the dryer for the new job. The start shares that END's
+photos, and deleting one of them never deletes photos the other still uses.
+
 Without signal, readings (with photos) are kept on the phone and upload by themselves
 later; the numbers have to be typed in, since reading photos needs the internet.
 

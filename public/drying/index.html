@@ -152,6 +152,14 @@
   .toggle button.on-start { border-color: var(--green-light); background: rgba(74,124,63,0.35); color: #cfeec7; }
   .toggle button.on-end { border-color: var(--red); background: rgba(184,74,63,0.3); color: #f3cdc9; }
 
+  .prev-title { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--wheat); margin: 12px 0 6px; }
+  .prev-end {
+    display: block; width: 100%; text-align: left; margin-bottom: 6px; padding: 10px 12px; border-radius: 6px;
+    background: rgba(0,0,0,0.25); border: 1px solid var(--border); color: var(--cream); cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; line-height: 1.5;
+  }
+  .prev-end b { font-family: 'IBM Plex Sans', sans-serif; font-size: 0.95rem; color: var(--wheat-light); }
+  .prev-end.picked { border-color: var(--green-light); background: rgba(74,124,63,0.3); }
   .save-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .btn-save {
     padding: 18px 8px; border-radius: 6px; border: 2px solid; background: rgba(0,0,0,0.25); cursor: pointer;
@@ -303,6 +311,7 @@
       <input type="text" id="v-customer" placeholder="Name" autocomplete="off" autocapitalize="words">
       <div class="suggest" id="customer-suggest"></div>
       <div class="hint" id="customer-hint"></div>
+      <div id="prev-ends"></div>
     </div>
 
     <span class="label" style="margin-top:4px">Numbers <span style="color:var(--muted);text-transform:none;letter-spacing:0">— filled in from the photos, fix if wrong</span></span>
@@ -898,7 +907,7 @@ function prepareImage(file) {
 function blankForm() {
   return { customer: '', kind: '', note: '',
            values: { electric: '', gas: '', jobHours: '', batches: '', burnerHours: '', dryerHours: '' },
-           fromPhoto: {}, photos: {}, reading: 0 };
+           fromPhoto: {}, photos: {}, reading: 0, fromEnd: null };
 }
 
 // A form saved while photos were being read (app closed mid-read) can't finish that read.
@@ -985,6 +994,7 @@ function handleFiles(files, forcedSlot) {
   files = Array.prototype.slice.call(files || []);
   if (!files.length) return;
   form.message = '';
+  form.fromEnd = null;
   files.forEach(function(file, i) {
     var slot = i === 0 ? forcedSlot : null;
     form.reading++;
@@ -1115,12 +1125,53 @@ function renderKind() {
   $('save-start').className = 'btn-save start' + (form.kind === 'start' ? ' suggested' : (form.kind ? ' dim' : ''));
   $('save-end').className   = 'btn-save end' + (form.kind === 'end' ? ' suggested' : (form.kind ? ' dim' : ''));
   renderZeroHint();
+  renderPrevEnds();
   var hint = $('customer-hint');
   hint.className = 'hint';
   if (!name) { hint.textContent = ''; return; }
   hint.textContent = open
     ? name + ' has a job going since ' + fmtWhen(open.ts) + ' — when it is done, tap Save END.'
     : 'No job going for ' + name + ' — tap Save START to begin one.';
+}
+
+// ---- start from the previous person's END ----
+// Back-to-back jobs: the meters haven't moved, so the last END can be used as the next START.
+function recentEnds() {
+  return allReadings().filter(function(r){ return r.kind === 'end'; }).reverse().slice(0, 3);
+}
+function renderPrevEnds() {
+  var box = $('prev-ends');
+  var ends = form.kind === 'start' || form.fromEnd ? recentEnds() : [];
+  if (!ends.length) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="prev-title">' + (form.fromEnd ? 'Start copied from:' : 'Or use the last END as this start (no photos needed):') + '</div>' +
+    ends.map(function(r) {
+      if (form.fromEnd && form.fromEnd !== r.id) return '';
+      return '<button type="button" class="prev-end' + (form.fromEnd === r.id ? ' picked' : '') + '" data-id="' + r.id + '">' +
+        (form.fromEnd === r.id ? '✓ ' : '') + '<b>' + esc(r.customer) + '</b> END · ' + fmtWhen(r.ts) + '<br>' +
+        '⚡ ' + fmtNum(r.electric) + ' · 🔥 ' + fmtNum(r.gas) + ' · dryer ' + fmtField('dryerHours', r.dryerHours) +
+        (form.fromEnd === r.id ? '<br><span style="color:var(--muted)">Tap to undo</span>' : '') + '</button>';
+    }).join('');
+  box.querySelectorAll('.prev-end').forEach(function(b) {
+    b.addEventListener('click', function() { useEnd(b.getAttribute('data-id')); });
+  });
+}
+function useEnd(id) {
+  if (form.fromEnd === id) {                       // tapped again: undo
+    form.fromEnd = null;
+    FIELDS.forEach(function(f){ form.values[f] = ''; form.fromPhoto[f] = false; });
+  } else {
+    var r = findReading(id);
+    if (!r) return;
+    form.fromEnd = id;
+    form.photos = {};
+    FIELDS.forEach(function(f) {
+      // Meters that count up carry over. Job hours, batches and burner hours get zeroed on the dryer for the new job.
+      form.values[f] = COUNTERS.indexOf(f) !== -1 && r[f] != null ? (isHours(f) ? fmtHM(r[f]) : String(r[f])) : '';
+      form.fromPhoto[f] = false;
+    });
+    form.message = 'Numbers copied from ' + r.customer + "'s END. Remember to press Zero on the dryer screen for the new job.";
+  }
+  renderForm(); saveDraft();
 }
 
 function clearForm(ask) {
@@ -1167,6 +1218,12 @@ function saveNew(kind) {
     id: newId('r_'), ts: Date.now(), customer: customer, kind: kind,
     note: form.note.trim(), by: currentUser.email, photos: {}
   };
+  var srcEnd = kind === 'start' && form.fromEnd ? findReading(form.fromEnd) : null;
+  if (srcEnd) {
+    reading.fromEnd = srcEnd.id;
+    reading.photos = Object.assign({}, srcEnd.photos || {});   // same photos, not a second copy
+    if (!reading.note) reading.note = 'Start = ' + srcEnd.customer + "'s end";
+  }
   FIELDS.forEach(function(f){ reading[f] = vals[f]; });
   var photos = {};
   SLOTS.forEach(function(s) {
@@ -1298,7 +1355,7 @@ function lineHtml(r, kind) {
   return '<div class="row-line" onclick="openEdit(\'' + r.id + '\')">' +
     '<div class="kind ' + kind + '">' + kind + '</div>' +
     '<div class="vals"><div class="when">' + fmtWhen(r.ts) + ' · ' + esc((r.by || '').split('@')[0]) +
-      (nPhotos ? ' · 📷' + nPhotos : '') + (r._pending ? ' <span class="badge pending">not uploaded</span>' : '') + '</div>' +
+      (nPhotos ? ' · 📷' + nPhotos : '') + (r.fromEnd ? ' · ↩ from prev. end' : '') + (r._pending ? ' <span class="badge pending">not uploaded</span>' : '') + '</div>' +
       '⚡ ' + fmtNum(r.electric) + ' · 🔥 ' + fmtNum(r.gas) + ' · ⏱ ' + fmtField('jobHours', r.jobHours) + ' job hrs · 🌾 ' + fmtNum(r.batches) +
       (r.note ? '<div class="when">' + esc(r.note) + '</div>' : '') +
     '</div><div class="arrow">›</div></div>';
@@ -1323,7 +1380,9 @@ function openEdit(id) {
   $('e-when').value = toLocalInput(r.ts);
   FIELDS.forEach(function(f){ $('e-' + f).value = r[f] == null ? '' : (isHours(f) ? fmtHM(r[f]) : r[f]); });
   $('e-note').value = r.note || '';
-  $('e-by').textContent = 'Saved by ' + (r.by || 'unknown') + (r._pending ? ' · not uploaded yet' : '');
+  var src = r.fromEnd ? findReading(r.fromEnd) : null;
+  $('e-by').textContent = 'Saved by ' + (r.by || 'unknown') + (r._pending ? ' · not uploaded yet' : '') +
+    (r.fromEnd ? ' · numbers copied from ' + (src ? src.customer + "'s END " + fmtWhen(src.ts) : 'a previous END') : '');
   setEditKind(r.kind);
   renderEditPhotos(r);
   $('edit-modal').classList.add('open');
@@ -1383,7 +1442,7 @@ function saveEdit() {
   if (!isFinite(ts)) { alert('Check the date and time.'); return; }
   var updated = {
     id: r.id, ts: ts, customer: customer, kind: editing.kind,
-    note: $('e-note').value.trim(), by: r.by, photos: r.photos || {},
+    note: $('e-note').value.trim(), by: r.by, photos: r.photos || {}, fromEnd: r.fromEnd,
     editedBy: currentUser.email, editedAt: Date.now()
   };
   for (var i = 0; i < FIELDS.length; i++) {
@@ -1402,7 +1461,14 @@ function deleteEdit() {
   var hadPending = outbox.some(function(o){ return o.type === 'put' && o.reading.id === r.id; });
   outbox = outbox.filter(function(o){ return !(o.type === 'put' && o.reading.id === r.id); });
   if (serverReadings[r.id] || !hadPending) {
-    queue({ type: 'delete', id: r.id, photoIds: (serverReadings[r.id] || r).photos || {} });
+    var used = {};
+    allReadings().forEach(function(o) {
+      if (o.id === r.id) return;
+      Object.keys(o.photos || {}).forEach(function(k){ used[o.photos[k]] = true; });
+    });
+    var own = (serverReadings[r.id] || r).photos || {}, photoIds = {};
+    Object.keys(own).forEach(function(k){ if (!used[own[k]]) photoIds[k] = own[k]; });
+    queue({ type: 'delete', id: r.id, photoIds: photoIds });
   } else {
     idbSet(userKey('outbox'), outbox).then(renderAll);
   }
