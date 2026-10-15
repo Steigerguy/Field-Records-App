@@ -136,6 +136,7 @@
   .numbers { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
   .numbers input { font-family: 'IBM Plex Mono', monospace; font-size: 1.1rem; }
   .numbers input.from-photo { border-color: rgba(107,163,94,0.7); }
+  .label.minor { color: var(--muted); }
 
   .suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .suggest button {
@@ -305,8 +306,10 @@
     <div class="numbers">
       <div class="field"><label class="label" for="v-electric">⚡ Electric kWh</label><input type="text" inputmode="decimal" id="v-electric"></div>
       <div class="field"><label class="label" for="v-gas" id="gas-label">🔥 Gas</label><input type="text" inputmode="decimal" id="v-gas"></div>
-      <div class="field"><label class="label" for="v-hours">⏱ Dryer hours</label><input type="text" inputmode="decimal" id="v-hours"></div>
-      <div class="field"><label class="label" for="v-batches">🌾 Batch</label><input type="text" inputmode="decimal" id="v-batches"></div>
+      <div class="field"><label class="label" for="v-jobHours">⏱ Job hours</label><input type="text" inputmode="text" placeholder="h:mm" id="v-jobHours"></div>
+      <div class="field"><label class="label" for="v-batches">🌾 Batches</label><input type="text" inputmode="decimal" id="v-batches"></div>
+      <div class="field"><label class="label minor" for="v-burnerHours">Burner hours</label><input type="text" inputmode="text" placeholder="h:mm" id="v-burnerHours"></div>
+      <div class="field"><label class="label minor" for="v-dryerHours">Dryer hours</label><input type="text" inputmode="text" placeholder="h:mm" id="v-dryerHours"></div>
     </div>
 
     <div class="field">
@@ -396,8 +399,10 @@
     <div class="numbers">
       <div class="field"><label class="label" for="e-electric">⚡ Electric kWh</label><input type="text" inputmode="decimal" id="e-electric"></div>
       <div class="field"><label class="label" for="e-gas">🔥 Gas</label><input type="text" inputmode="decimal" id="e-gas"></div>
-      <div class="field"><label class="label" for="e-hours">⏱ Dryer hours</label><input type="text" inputmode="decimal" id="e-hours"></div>
-      <div class="field"><label class="label" for="e-batches">🌾 Batch</label><input type="text" inputmode="decimal" id="e-batches"></div>
+      <div class="field"><label class="label" for="e-jobHours">⏱ Job hours</label><input type="text" inputmode="text" placeholder="h:mm" id="e-jobHours"></div>
+      <div class="field"><label class="label" for="e-batches">🌾 Batches</label><input type="text" inputmode="decimal" id="e-batches"></div>
+      <div class="field"><label class="label minor" for="e-burnerHours">Burner hours</label><input type="text" inputmode="text" placeholder="h:mm" id="e-burnerHours"></div>
+      <div class="field"><label class="label minor" for="e-dryerHours">Dryer hours</label><input type="text" inputmode="text" placeholder="h:mm" id="e-dryerHours"></div>
     </div>
     <div class="field">
       <label class="label" for="e-note">Note</label>
@@ -433,7 +438,12 @@ var SLOTS = [
   { key: 'gas',      name: 'Gas',      icon: '🔥' },
   { key: 'dryer',    name: 'Dryer',    icon: '⏱' }
 ];
-var FIELDS = ['electric', 'gas', 'hours', 'batches'];
+var FIELDS = ['electric', 'gas', 'jobHours', 'batches', 'burnerHours', 'dryerHours'];
+// Meters that keep counting up: usage = end − start.
+// Job hours, batches and burner hours are zeroed at the start of each job: usage = the end reading.
+var COUNTERS = ['electric', 'gas', 'dryerHours'];
+var FIELD_NAMES = { electric: 'electric', gas: 'gas', jobHours: 'job hours', batches: 'batches',
+                    burnerHours: 'burner hours', dryerHours: 'dryer hours' };
 
 // ===================== STATE =====================
 var currentUser = null, idToken = null, tokenExpiry = 0, refreshPromise = null;
@@ -469,6 +479,24 @@ function fmtWhen(ts) {
          d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 function sameName(a, b) { return (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase(); }
+// Dryer screen hours read like "47:32" (hours:minutes). Stored as decimal hours.
+var HOUR_FIELDS = ['jobHours', 'burnerHours', 'dryerHours'];
+function isHours(f) { return HOUR_FIELDS.indexOf(f) !== -1; }
+function parseHours(v) {
+  var m = String(v == null ? '' : v).replace(/,/g, '').trim().match(/^(\d+)\s*[:h]\s*(\d{1,2})$/i);
+  if (m) return Number(m[2]) < 60 ? Number(m[1]) + Number(m[2]) / 60 : null;
+  return num(v);
+}
+function fmtHM(v) {
+  if (v === null || v === undefined || v === '') return '';
+  var total = Math.round(Math.abs(v) * 60);
+  return (v < 0 ? '-' : '') + Math.floor(total / 60) + ':' + ('0' + (total % 60)).slice(-2);
+}
+function parseField(f, v) { return isHours(f) ? parseHours(v) : num(v); }
+function fmtField(f, v) {
+  if (v === null || v === undefined || v === '') return '—';
+  return isHours(f) ? fmtHM(v) : fmtNum(v);
+}
 function gasUnit() { return settings.gasUnit || 'ft³'; }
 function mult(v) { var n = num(v); return n && n > 0 ? n : 1; }
 
@@ -740,7 +768,13 @@ var READ_PROMPT = [
   'photo_type:',
   '- "electric_meter": an electricity meter. Put the main cumulative kWh reading in electric_kwh. For dial meters, read each dial in order; when a pointer sits between two digits use the lower digit. Ignore serial numbers, barcodes, "Kh", voltage/amp ratings and multiplier text.',
   '- "gas_meter": a natural gas or propane meter. Put the main cumulative index (odometer wheels or dials) in gas. Ignore small test dials, serial numbers and pressure gauges. Only include decimals if the meter shows a decimal point or marks the last wheel(s) as decimals.',
-  '- "dryer_screen": a grain dryer control panel or display. Put the total run hours in dryer_hours and the batch count or batch amount shown on the screen in batches.',
+  '- "dryer_screen": the grain dryer control touch screen. Read only these labelled boxes:',
+  '    job_hours: the box labelled "Job Hours" (zeroed for each job).',
+  '    burner_hours: the box labelled "Burner Hours" (zeroed for each job).',
+  '    dryer_hours: the box labelled "Dryer Hours" (lifetime total that keeps counting up).',
+  '    batches: the box labelled "Batch Count" (zeroed for each job). Not "Batches Set", which is a setting.',
+  '  Hours are shown as hours:minutes, e.g. "47 : 32". Return them as text exactly in that form without spaces, e.g. "47:32" or "1264:00".',
+  '  Ignore every other box (times, elapsed minutes, moisture, temperatures, samples).',
   '- "other": none of the above.',
   '',
   'Set every number that is not shown in this photo to null. Never guess a digit: if any digit of a number cannot be read, set that number to null.',
@@ -750,13 +784,15 @@ var READ_PROMPT = [
 var READ_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['photo_type', 'electric_kwh', 'gas', 'dryer_hours', 'batches', 'note'],
+  required: ['photo_type', 'electric_kwh', 'gas', 'job_hours', 'batches', 'burner_hours', 'dryer_hours', 'note'],
   properties: {
     photo_type:   { type: 'string', enum: ['electric_meter', 'gas_meter', 'dryer_screen', 'other'] },
     electric_kwh: { anyOf: [{ type: 'number' }, { type: 'null' }] },
     gas:          { anyOf: [{ type: 'number' }, { type: 'null' }] },
-    dryer_hours:  { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    job_hours:    { anyOf: [{ type: 'string' }, { type: 'null' }] },
     batches:      { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    burner_hours: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    dryer_hours:  { anyOf: [{ type: 'string' }, { type: 'null' }] },
     note:         { type: 'string' }
   }
 };
@@ -826,7 +862,7 @@ function prepareImage(file) {
 // ===================== NEW READING FORM =====================
 function blankForm() {
   return { customer: '', kind: '', kindChosen: false, note: '',
-           values: { electric: '', gas: '', hours: '', batches: '' },
+           values: { electric: '', gas: '', jobHours: '', batches: '', burnerHours: '', dryerHours: '' },
            fromPhoto: {}, photos: {}, reading: 0 };
 }
 
@@ -934,10 +970,11 @@ function handleFiles(files, forcedSlot) {
         var s = slot || TYPE_TO_SLOT[res.photo_type] || tmp;
         if (tmp && tmp !== s && form.photos[tmp] && form.photos[tmp].keep === img.keep) delete form.photos[tmp];
         if (!s) { form.message = "Couldn't tell what one photo was — tap a tile to retake it."; return; }
-        var got = { electric: res.electric_kwh, gas: res.gas, hours: res.dryer_hours, batches: res.batches };
+        var got = { electric: res.electric_kwh, gas: res.gas, jobHours: res.job_hours, batches: res.batches,
+                    burnerHours: res.burner_hours, dryerHours: res.dryer_hours };
         var any = false;
         FIELDS.forEach(function(f) {
-          if (got[f] !== null && got[f] !== undefined) {
+          if (got[f] !== null && got[f] !== undefined && parseField(f, got[f]) !== null) {
             form.values[f] = String(got[f]); form.fromPhoto[f] = true; any = true;
           }
         });
@@ -1067,26 +1104,26 @@ function saveNew() {
   var vals = {}, bad = [];
   FIELDS.forEach(function(f) {
     var raw = form.values[f];
-    var n = num(raw);
+    var n = parseField(f, raw);
     if (String(raw || '').trim() && n === null) bad.push(f);
     vals[f] = n;
   });
-  if (bad.length) { alert('These numbers look wrong: ' + bad.join(', ')); return; }
+  if (bad.length) { alert('These numbers look wrong: ' + bad.map(function(f){ return FIELD_NAMES[f]; }).join(', ')); return; }
   if (FIELDS.every(function(f){ return vals[f] === null; })) { alert('Take a picture or type at least one number.'); return; }
 
   if (form.kind === 'end') {
     var start = openStart(customer);
     if (start) {
-      var lower = FIELDS.filter(function(f){ return vals[f] !== null && start[f] != null && vals[f] < start[f]; });
-      if (lower.length && !confirm('These are LOWER than the start reading: ' + lower.join(', ') + '. Save anyway?')) return;
+      var lower = COUNTERS.filter(function(f){ return vals[f] !== null && start[f] != null && vals[f] < start[f]; });
+      if (lower.length && !confirm('These are LOWER than the start reading: ' + lower.map(function(f){ return FIELD_NAMES[f]; }).join(', ') + '. Save anyway?')) return;
     }
   }
 
   var reading = {
     id: newId('r_'), ts: Date.now(), customer: customer, kind: form.kind,
-    electric: vals.electric, gas: vals.gas, hours: vals.hours, batches: vals.batches,
     note: form.note.trim(), by: currentUser.email, photos: {}
   };
+  FIELDS.forEach(function(f){ reading[f] = vals[f]; });
   var photos = {};
   SLOTS.forEach(function(s) {
     var p = form.photos[s.key];
@@ -1126,10 +1163,12 @@ function buildJobs(readings) {
   jobs.forEach(function(j) {
     if (!j.start || !j.end) return;
     j.used = {
-      electric: diff(j.start.electric, j.end.electric, mult(settings.elecMult)),
-      gas:      diff(j.start.gas, j.end.gas, mult(settings.gasMult)),
-      hours:    diff(j.start.hours, j.end.hours, 1),
-      batches:  diff(j.start.batches, j.end.batches, 1)
+      electric:    diff(j.start.electric, j.end.electric, mult(settings.elecMult)),
+      gas:         diff(j.start.gas, j.end.gas, mult(settings.gasMult)),
+      dryerHours:  diff(j.start.dryerHours, j.end.dryerHours, 1),
+      jobHours:    endValue(j.end.jobHours),
+      batches:     endValue(j.end.batches),
+      burnerHours: endValue(j.end.burnerHours)
     };
   });
   return jobs;
@@ -1138,6 +1177,7 @@ function diff(a, b, m) {
   if (a === null || a === undefined || b === null || b === undefined) return null;
   return Math.round((b - a) * m * 1000) / 1000;
 }
+function endValue(v) { return v === null || v === undefined ? null : v; }
 function jobTime(j) { return (j.end || j.start).ts; }
 
 function renderLog() {
@@ -1165,7 +1205,7 @@ function renderLog() {
   var totals = {}, order = [];
   jobs.forEach(function(j) {
     var k = j.customer.trim().toLowerCase();
-    if (!totals[k]) { totals[k] = { name: j.customer.trim(), jobs: 0, electric: 0, gas: 0, hours: 0, batches: 0 }; order.push(k); }
+    if (!totals[k]) { totals[k] = { name: j.customer.trim(), jobs: 0, electric: 0, gas: 0, jobHours: 0, batches: 0, burnerHours: 0, dryerHours: 0 }; order.push(k); }
     var t = totals[k];
     if (j.used) {
       t.jobs++;
@@ -1177,11 +1217,11 @@ function renderLog() {
   } else {
     order.sort(function(a, b){ return totals[a].name.localeCompare(totals[b].name); });
     $('totals').innerHTML = '<h3 class="sec" style="margin-top:4px">Totals</h3><div class="card table-wrap"><table class="totals"><tr>' +
-      '<th>Who</th><th>Jobs</th><th>kWh</th><th>Gas ' + esc(gasUnit()) + '</th><th>Hours</th><th>Batch</th></tr>' +
+      '<th>Who</th><th>Jobs</th><th>kWh</th><th>Gas ' + esc(gasUnit()) + '</th><th>Job hrs</th><th>Batches</th></tr>' +
       order.map(function(k) {
         var t = totals[k];
         return '<tr><td>' + esc(t.name) + '</td><td>' + t.jobs + '</td><td>' + fmtNum(t.electric) + '</td><td>' +
-          fmtNum(t.gas) + '</td><td>' + fmtNum(t.hours) + '</td><td>' + fmtNum(t.batches) + '</td></tr>';
+          fmtNum(t.gas) + '</td><td>' + fmtField('jobHours', t.jobHours) + '</td><td>' + fmtNum(t.batches) + '</td></tr>';
       }).join('') + '</table></div><p class="hint">Totals count finished jobs (a start and an end).</p>';
   }
 
@@ -1196,15 +1236,16 @@ function renderLog() {
     if (j.used) {
       chips = '<div class="chips">' +
         usedChip('⚡', j.used.electric, 'kWh') + usedChip('🔥', j.used.gas, gasUnit()) +
-        usedChip('⏱', j.used.hours, 'hr') + usedChip('🌾', j.used.batches, 'batch') + '</div>';
+        usedChip('⏱', j.used.jobHours, 'job hrs', true) + usedChip('🌾', j.used.batches, 'batches') +
+        usedChip('♨', j.used.burnerHours, 'burner hrs', true) + '</div>';
     }
     return '<div class="card"><div class="card-title">' + esc(j.customer) + badges + '</div>' + chips +
       lineHtml(j.start, 'start') + lineHtml(j.end, 'end') + '</div>';
   }).join('');
 }
-function usedChip(icon, v, unit) {
+function usedChip(icon, v, unit, hours) {
   if (v === null) return '';
-  return '<span class="chip' + (v < 0 ? ' neg' : '') + '">' + icon + ' ' + fmtNum(v) + ' ' + esc(unit) + (v < 0 ? ' ⚠' : '') + '</span>';
+  return '<span class="chip' + (v < 0 ? ' neg' : '') + '">' + icon + ' ' + (hours ? fmtHM(v) : fmtNum(v)) + ' ' + esc(unit) + (v < 0 ? ' ⚠' : '') + '</span>';
 }
 function lineHtml(r, kind) {
   if (!r) return '';
@@ -1213,7 +1254,7 @@ function lineHtml(r, kind) {
     '<div class="kind ' + kind + '">' + kind + '</div>' +
     '<div class="vals"><div class="when">' + fmtWhen(r.ts) + ' · ' + esc((r.by || '').split('@')[0]) +
       (nPhotos ? ' · 📷' + nPhotos : '') + (r._pending ? ' <span class="badge pending">not uploaded</span>' : '') + '</div>' +
-      '⚡ ' + fmtNum(r.electric) + ' · 🔥 ' + fmtNum(r.gas) + ' · ⏱ ' + fmtNum(r.hours) + ' · 🌾 ' + fmtNum(r.batches) +
+      '⚡ ' + fmtNum(r.electric) + ' · 🔥 ' + fmtNum(r.gas) + ' · ⏱ ' + fmtField('jobHours', r.jobHours) + ' job hrs · 🌾 ' + fmtNum(r.batches) +
       (r.note ? '<div class="when">' + esc(r.note) + '</div>' : '') +
     '</div><div class="arrow">›</div></div>';
 }
@@ -1235,7 +1276,7 @@ function openEdit(id) {
   $('edit-title').textContent = r.customer + ' — ' + r.kind;
   $('e-customer').value = r.customer || '';
   $('e-when').value = toLocalInput(r.ts);
-  FIELDS.forEach(function(f){ $('e-' + f).value = r[f] == null ? '' : r[f]; });
+  FIELDS.forEach(function(f){ $('e-' + f).value = r[f] == null ? '' : (isHours(f) ? fmtHM(r[f]) : r[f]); });
   $('e-note').value = r.note || '';
   $('e-by').textContent = 'Saved by ' + (r.by || 'unknown') + (r._pending ? ' · not uploaded yet' : '');
   setEditKind(r.kind);
@@ -1301,8 +1342,8 @@ function saveEdit() {
     editedBy: currentUser.email, editedAt: Date.now()
   };
   for (var i = 0; i < FIELDS.length; i++) {
-    var f = FIELDS[i], raw = $('e-' + f).value, n = num(raw);
-    if (raw.trim() && n === null) { alert('Check the ' + f + ' number.'); return; }
+    var f = FIELDS[i], raw = $('e-' + f).value, n = parseField(f, raw);
+    if (raw.trim() && n === null) { alert('Check the ' + FIELD_NAMES[f] + ' number.'); return; }
     updated[f] = n;
   }
   closeEdit();
@@ -1328,8 +1369,9 @@ function exportCSV() {
   var jobs = buildJobs(allReadings());
   var usedFor = {};
   jobs.forEach(function(j){ if (j.end && j.used) usedFor[j.end.id] = j.used; });
-  var rows = [['Date', 'Time', 'Who', 'Start/End', 'Electric kWh', 'Gas ' + gasUnit(), 'Dryer hours', 'Batch',
-               'kWh used', 'Gas used', 'Hours run', 'Batches', 'Note', 'Saved by']];
+  var rows = [['Date', 'Time', 'Who', 'Start/End', 'Electric kWh', 'Gas ' + gasUnit(), 'Job hours', 'Batches',
+               'Burner hours', 'Dryer hours', 'kWh used', 'Gas used', 'Job hours (job)', 'Batches (job)',
+               'Burner hours (job)', 'Note', 'Saved by']];
   allReadings().forEach(function(r) {
     var d = new Date(r.ts);
     if (year !== 'all' && d.getFullYear() !== Number(year)) return;
@@ -1337,8 +1379,8 @@ function exportCSV() {
     var u = usedFor[r.id] || {};
     rows.push([
       d.toLocaleDateString('en-CA'), d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      r.customer, r.kind, r.electric, r.gas, r.hours, r.batches,
-      u.electric, u.gas, u.hours, u.batches, r.note, r.by
+      r.customer, r.kind, r.electric, r.gas, fmtHM(r.jobHours), r.batches, fmtHM(r.burnerHours), fmtHM(r.dryerHours),
+      u.electric, u.gas, fmtHM(u.jobHours), u.batches, fmtHM(u.burnerHours), r.note, r.by
     ]);
   });
   var csv = rows.map(function(row) {
