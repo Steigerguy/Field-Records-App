@@ -7,6 +7,10 @@
       { "source": "/index.html",    "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
       { "source": "/sw.js",         "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
       { "source": "/manifest.json", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+      { "source": "/drying/",           "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+      { "source": "/drying/index.html", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+      { "source": "/drying/sw.js",      "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+      { "source": "/drying/manifest.json", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
       { "source": "**/*.@(png|svg)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }] }
     ]
   }

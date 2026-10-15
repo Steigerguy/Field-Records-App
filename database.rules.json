@@ -5,6 +5,10 @@
         ".read":  "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid"
       }
+    },
+    "grainDrying": {
+      ".read":  "auth != null && root.child('grainDryingMembers').child(auth.uid).val() === true",
+      ".write": "auth != null && root.child('grainDryingMembers').child(auth.uid).val() === true"
     }
   }
 }

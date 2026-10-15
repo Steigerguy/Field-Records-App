@@ -1,0 +1,16 @@
+{
+  "id": "/drying/",
+  "name": "Grain Drying",
+  "short_name": "Drying",
+  "description": "Grain dryer meter readings — take a picture, the numbers log themselves",
+  "start_url": "/drying/",
+  "scope": "/drying/",
+  "display": "standalone",
+  "background_color": "#2a1f0e",
+  "theme_color": "#c8922a",
+  "icons": [
+    { "src": "/icon-192.png",          "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png",          "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

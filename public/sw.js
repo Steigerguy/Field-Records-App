@@ -1,6 +1,6 @@
 // Field Records Service Worker
 // Bump CACHE when you deploy changes to the shell files below; old caches are deleted on activate.
-const CACHE = 'field-records-v5';
+const CACHE = 'field-records-v6';
 const SHELL = [
   '/',
   '/manifest.json',
@@ -22,7 +22,7 @@ self.addEventListener('install', function(e) {
 self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(keys) {
-      return Promise.all(keys.filter(function(k){ return k !== CACHE; }).map(function(k){ return caches.delete(k); }));
+      return Promise.all(keys.filter(function(k){ return k !== CACHE && k.indexOf('grain-drying-') !== 0; }).map(function(k){ return caches.delete(k); }));
     }).then(function() { return self.clients.claim(); })
   );
 });
@@ -49,6 +49,9 @@ self.addEventListener('fetch', function(e) {
   // Everything else off-site (Firebase auth + database) goes straight to the network.
   // Never fake a response here: the app must see real failures to know a save didn't land.
   if (url.origin !== self.location.origin) return;
+
+  // The Grain Drying app has its own service worker; don't cache its pages as this app's.
+  if (url.pathname.indexOf('/drying/') === 0) return;
 
   // The page itself: network-first so deploys show up right away, cached copy when offline
   if (req.mode === 'navigate') {

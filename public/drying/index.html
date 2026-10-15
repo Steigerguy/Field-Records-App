@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Grain Drying</title>
+<link rel="manifest" href="/drying/manifest.json">
+<meta name="theme-color" content="#c8922a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Grain Drying">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+
+  :root {
+    --soil: #2a1f0e;
+    --earth: #3d2b0f;
+    --wheat: #c8922a;
+    --wheat-light: #e8b84b;
+    --grain: #f2d98a;
+    --sky: #7db8d4;
+    --sky-dark: #4a8aad;
+    --green: #4a7c3f;
+    --green-light: #6ba35e;
+    --red: #b84a3f;
+    --cream: #f5edd8;
+    --text: #f5edd8;
+    --muted: rgba(245,237,216,0.5);
+    --card: rgba(255,255,255,0.05);
+    --border: rgba(200,146,42,0.25);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  input, select, textarea {
+    color: #f5edd8 !important;
+    -webkit-text-fill-color: #f5edd8 !important;
+    opacity: 1 !important;
+    font-size: 16px;   /* keeps iOS from zooming on focus */
+  }
+  input::placeholder, textarea::placeholder { color: rgba(245,237,216,0.35) !important; -webkit-text-fill-color: rgba(245,237,216,0.35) !important; }
+
+  body {
+    background: var(--soil);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--earth);
+    border-bottom: 3px solid var(--wheat);
+    padding: 14px 16px;
+    padding-top: calc(14px + env(safe-area-inset-top));
+    padding-left: calc(16px + env(safe-area-inset-left));
+    padding-right: calc(16px + env(safe-area-inset-right));
+    display: flex; align-items: center; gap: 12px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  }
+  .logo { font-family: 'Bebas Neue', sans-serif; font-size: 1.9rem; color: var(--wheat); letter-spacing: 3px; line-height: 1; }
+  .logo span { color: var(--grain); }
+  #save-indicator {
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: var(--wheat-light);
+    margin-left: auto; opacity: 0; transition: opacity 0.3s; text-align: right;
+  }
+
+  .nav-tabs { display: flex; background: var(--earth); border-bottom: 1px solid var(--border); padding: 0 8px; overflow-x: auto; }
+  .nav-tab {
+    flex: 1; text-align: center; padding: 13px 10px; cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--muted); border-bottom: 3px solid transparent; white-space: nowrap;
+  }
+  .nav-tab.active { color: var(--wheat); border-bottom-color: var(--wheat); }
+
+  .main { padding: 18px 16px calc(28px + env(safe-area-inset-bottom)); max-width: 760px; margin: 0 auto; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .btn {
+    background: var(--wheat); color: var(--soil); border: none; padding: 12px 20px;
+    font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 0.85rem; letter-spacing: 1px;
+    text-transform: uppercase; cursor: pointer; border-radius: 6px; text-align: center;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn:active { background: var(--wheat-light); }
+  .btn:disabled { opacity: 0.5; }
+  .btn-big { width: 100%; padding: 20px; font-size: 1.05rem; }
+  .btn-sm { padding: 7px 12px; font-size: 0.72rem; }
+  .btn-ghost { background: transparent; color: var(--cream); border: 1px solid var(--border); }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-row { display: flex; gap: 10px; margin-top: 10px; }
+  .btn-row > * { flex: 1; }
+
+  .label {
+    display: block; font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--wheat); margin-bottom: 6px;
+  }
+  .field { margin-bottom: 16px; }
+  .field input, .field select, .field textarea {
+    width: 100%; background: rgba(0,0,0,0.35); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px; font-family: 'IBM Plex Sans', sans-serif;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--wheat); }
+  .field select option { background: var(--earth); }
+  .hint { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  .hint.warn { color: #e8c07a; }
+  .hint.bad { color: #e8a8a3; }
+
+  /* Photo tiles */
+  .shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+  .shot {
+    position: relative; aspect-ratio: 3 / 4; border: 2px dashed var(--border); border-radius: 8px;
+    background: rgba(0,0,0,0.25); overflow: hidden; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  }
+  .shot.filled { border-style: solid; border-color: var(--wheat); }
+  .shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .shot .icon { font-size: 1.8rem; }
+  .shot .name { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; letter-spacing: 1px; text-transform: uppercase; color: var(--grain); margin-top: 4px; }
+  .shot .tag {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 5px 4px;
+    background: rgba(20,14,5,0.85); font-family: 'IBM Plex Mono', monospace; font-size: 0.66rem; color: var(--grain);
+  }
+  .shot .tag.ok { color: #a8d99e; }
+  .shot .tag.bad { color: #e8a8a3; }
+  .shot .remove {
+    position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%;
+    border: none; background: rgba(20,14,5,0.85); color: var(--cream); font-size: 0.9rem; cursor: pointer;
+  }
+  #read-status { min-height: 18px; margin-bottom: 14px; }
+
+  .numbers { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  .numbers input { font-family: 'IBM Plex Mono', monospace; font-size: 1.1rem; }
+  .numbers input.from-photo { border-color: rgba(107,163,94,0.7); }
+
+  .suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .suggest button {
+    background: rgba(255,255,255,0.07); border: 1px solid var(--border); border-radius: 18px;
+    padding: 7px 14px; color: var(--grain); font-family: 'IBM Plex Sans', sans-serif; font-size: 0.9rem; cursor: pointer;
+  }
+
+  .toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .toggle button {
+    padding: 16px; border-radius: 6px; border: 2px solid var(--border); background: rgba(0,0,0,0.25);
+    color: var(--muted); font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 2px; cursor: pointer;
+  }
+  .toggle button.on-start { border-color: var(--green-light); background: rgba(74,124,63,0.35); color: #cfeec7; }
+  .toggle button.on-end { border-color: var(--red); background: rgba(184,74,63,0.3); color: #f3cdc9; }
+
+  /* Log */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
+  .card-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.45rem; letter-spacing: 1px; color: var(--wheat-light); }
+  .card-sub { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--muted); }
+  .badge {
+    display: inline-block; font-family: 'IBM Plex Mono', monospace; font-size: 0.66rem; letter-spacing: 1px;
+    text-transform: uppercase; padding: 2px 8px; border-radius: 10px; margin-left: 6px; vertical-align: middle;
+  }
+  .badge.open { background: rgba(232,184,75,0.2); color: var(--wheat-light); }
+  .badge.pending { background: rgba(125,184,212,0.2); color: #a8d4e8; }
+  .badge.warn { background: rgba(184,74,63,0.25); color: #f3cdc9; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+  .chip {
+    background: rgba(255,255,255,0.07); border: 1px solid var(--border); border-radius: 16px; padding: 4px 11px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--grain);
+  }
+  .chip.neg { border-color: var(--red); color: #f3cdc9; }
+  .row-line {
+    display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid rgba(200,146,42,0.12); cursor: pointer;
+  }
+  .row-line .kind { font-family: 'Bebas Neue', sans-serif; font-size: 1.15rem; letter-spacing: 1px; width: 46px; }
+  .row-line .kind.start { color: var(--green-light); }
+  .row-line .kind.end { color: #e07d72; }
+  .row-line .vals { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--cream); line-height: 1.5; flex: 1; min-width: 0; }
+  .row-line .vals .when { color: var(--muted); }
+  .row-line .arrow { color: var(--muted); }
+
+  .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 4px; }
+  table.totals { width: 100%; border-collapse: collapse; font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; }
+  table.totals th, table.totals td { text-align: right; padding: 6px 4px; border-bottom: 1px solid rgba(200,146,42,0.12); }
+  table.totals th:first-child, table.totals td:first-child { text-align: left; }
+  table.totals th { color: var(--wheat); font-weight: 600; text-transform: uppercase; font-size: 0.66rem; letter-spacing: 1px; }
+  .table-wrap { overflow-x: auto; }
+  .empty { text-align: center; padding: 40px 10px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; }
+  h3.sec { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 2px; color: var(--wheat); margin: 18px 0 10px; }
+
+  /* Modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.75);
+    align-items: flex-start; justify-content: center; overflow-y: auto; padding: 20px 12px;
+    padding-top: calc(20px + env(safe-area-inset-top));
+  }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--earth); border: 1px solid var(--wheat); border-radius: 10px; padding: 20px 18px; width: 100%; max-width: 560px; }
+  .modal h2 { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 2px; color: var(--wheat); margin-bottom: 14px; }
+  .modal-photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+  .modal-photos a { display: block; aspect-ratio: 3/4; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; position: relative; background: rgba(0,0,0,0.3); }
+  .modal-photos img { width: 100%; height: 100%; object-fit: cover; }
+  .modal-photos span { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(20,14,5,0.85); font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem; color: var(--grain); text-align: center; padding: 3px; }
+  .photo-full { position: fixed; inset: 0; z-index: 300; background: #000; display: none; align-items: center; justify-content: center; }
+  .photo-full.open { display: flex; }
+  .photo-full img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+  /* Auth */
+  #auth-screen, #blocked-screen { display: none; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+  .auth-card { background: var(--earth); border: 1px solid var(--wheat); border-radius: 10px; padding: 32px 26px; width: 100%; max-width: 400px; }
+  .auth-card .logo { font-size: 2.4rem; margin-bottom: 6px; }
+  .auth-sub { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 24px; }
+  .auth-error { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: #e8a8a3; min-height: 20px; margin-bottom: 8px; }
+  code.uid { display: block; word-break: break-all; background: rgba(0,0,0,0.35); padding: 10px; border-radius: 6px; margin: 10px 0; font-size: 0.85rem; color: var(--grain); user-select: all; }
+
+  .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--grain); border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -2px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- ====== SIGN IN ====== -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="logo">Grain <span>Drying</span></div>
+    <div class="auth-sub">Sign in — same account as Field Records</div>
+    <div class="field">
+      <label class="label">Email</label>
+      <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="username"
+        onkeydown="if(event.key==='Enter') document.getElementById('auth-pass').focus()">
+    </div>
+    <div class="field">
+      <label class="label">Password</label>
+      <input type="password" id="auth-pass" placeholder="Password" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <div id="auth-error" class="auth-error"></div>
+    <div class="btn-row">
+      <button class="btn" onclick="doLogin()">Sign In</button>
+      <button class="btn btn-ghost" onclick="doRegister()">Create Account</button>
+    </div>
+    <div style="text-align:center;margin-top:16px">
+      <a href="#" onclick="doResetPassword();return false" style="font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--muted)">Forgot password?</a>
+    </div>
+  </div>
+</div>
+
+<!-- ====== NOT APPROVED YET ====== -->
+<div id="blocked-screen">
+  <div class="auth-card">
+    <div class="logo">Grain <span>Drying</span></div>
+    <div class="auth-sub">Waiting for access</div>
+    <p style="line-height:1.6">You're signed in as <b id="blocked-email"></b>, but this account hasn't been added to the drying log yet.</p>
+    <p class="hint" style="margin-top:10px">Send this ID to whoever set up the app. They add it under <b>grainDryingMembers</b> in the Firebase console (see the README):</p>
+    <code class="uid" id="blocked-uid"></code>
+    <div class="btn-row">
+      <button class="btn" onclick="startApp()">Try Again</button>
+      <button class="btn btn-ghost" onclick="doLogout()">Sign Out</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== APP ====== -->
+<div id="app-screen" style="display:none">
+<header>
+  <div class="logo">Grain <span>Drying</span></div>
+  <span id="save-indicator"></span>
+</header>
+
+<nav class="nav-tabs">
+  <div class="nav-tab active" data-section="new" onclick="showSection('new')">📷 New</div>
+  <div class="nav-tab" data-section="log" onclick="showSection('log')">Log</div>
+  <div class="nav-tab" data-section="settings" onclick="showSection('settings')">⚙ Settings</div>
+</nav>
+
+<div class="main">
+
+  <!-- ====== NEW READING ====== -->
+  <div class="section active" id="section-new">
+    <div class="shots" id="shots"></div>
+    <div id="read-status" class="hint"></div>
+
+    <label class="btn btn-big" for="cam-input">📷 Take Picture</label>
+    <input type="file" id="cam-input" accept="image/*" capture="environment" style="display:none">
+    <div class="btn-row" style="margin-bottom:22px">
+      <label class="btn btn-ghost btn-sm" for="gallery-input">🖼 Pick from photos</label>
+    </div>
+    <input type="file" id="gallery-input" accept="image/*" multiple style="display:none">
+
+    <div class="field">
+      <label class="label" for="v-customer">Who it's for</label>
+      <input type="text" id="v-customer" placeholder="Name" autocomplete="off" autocapitalize="words">
+      <div class="suggest" id="customer-suggest"></div>
+      <div class="hint" id="customer-hint"></div>
+    </div>
+
+    <div class="field">
+      <span class="label">Start or end?</span>
+      <div class="toggle">
+        <button type="button" id="kind-start" onclick="setKind('start', true)">Start</button>
+        <button type="button" id="kind-end" onclick="setKind('end', true)">End</button>
+      </div>
+    </div>
+
+    <span class="label" style="margin-top:4px">Numbers <span style="color:var(--muted);text-transform:none;letter-spacing:0">— filled in from the photos, fix if wrong</span></span>
+    <div class="numbers">
+      <div class="field"><label class="label" for="v-electric">⚡ Electric kWh</label><input type="text" inputmode="decimal" id="v-electric"></div>
+      <div class="field"><label class="label" for="v-gas" id="gas-label">🔥 Gas</label><input type="text" inputmode="decimal" id="v-gas"></div>
+      <div class="field"><label class="label" for="v-hours">⏱ Dryer hours</label><input type="text" inputmode="decimal" id="v-hours"></div>
+      <div class="field"><label class="label" for="v-batches">🌾 Batch</label><input type="text" inputmode="decimal" id="v-batches"></div>
+    </div>
+
+    <div class="field">
+      <label class="label" for="v-note">Note (optional)</label>
+      <input type="text" id="v-note" placeholder="e.g. Corn, bin 3">
+    </div>
+
+    <button class="btn btn-big btn-green" id="save-btn" onclick="saveNew()">✓ Save Reading</button>
+    <div class="btn-row"><button class="btn btn-ghost btn-sm" onclick="clearForm(true)">Clear form</button></div>
+  </div>
+
+  <!-- ====== LOG ====== -->
+  <div class="section" id="section-log">
+    <div class="filters">
+      <div class="field"><label class="label" for="f-year">Year</label><select id="f-year" onchange="renderLog()"></select></div>
+      <div class="field"><label class="label" for="f-customer">Who</label><select id="f-customer" onchange="renderLog()"></select></div>
+    </div>
+    <div id="totals"></div>
+    <h3 class="sec">Drying Jobs</h3>
+    <div id="jobs"></div>
+    <div class="btn-row" style="margin-top:18px">
+      <button class="btn btn-ghost" onclick="exportCSV()">⬇ Export spreadsheet (CSV)</button>
+    </div>
+  </div>
+
+  <!-- ====== SETTINGS ====== -->
+  <div class="section" id="section-settings">
+    <div class="card">
+      <div class="card-title">Photo reading</div>
+      <p class="hint" style="margin-bottom:12px">Photos are read by Claude (Anthropic). Paste an API key from console.anthropic.com once here — it's shared with everyone on the drying log, so nobody else needs to enter it. Each photo costs about a cent.</p>
+      <div class="field">
+        <label class="label" for="s-key">Claude API key</label>
+        <input type="password" id="s-key" placeholder="sk-ant-..." autocomplete="off">
+        <div class="hint" id="s-key-status"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Meters</div>
+      <div class="field">
+        <label class="label" for="s-gas-unit">Gas meter unit</label>
+        <input type="text" id="s-gas-unit" placeholder="ft³">
+      </div>
+      <div class="numbers">
+        <div class="field">
+          <label class="label" for="s-elec-mult">Electric multiplier</label>
+          <input type="text" inputmode="decimal" id="s-elec-mult" placeholder="1">
+        </div>
+        <div class="field">
+          <label class="label" for="s-gas-mult">Gas multiplier</label>
+          <input type="text" inputmode="decimal" id="s-gas-mult" placeholder="1">
+        </div>
+      </div>
+      <p class="hint">Only change a multiplier if the meter face says something like "Multiply by 40" or "×100". Usage = (end − start) × multiplier. Readings themselves are always saved exactly as shown.</p>
+    </div>
+    <button class="btn btn-big" onclick="saveSettings()">Save Settings</button>
+    <div class="hint" id="s-status" style="margin-top:8px"></div>
+
+    <div class="card" style="margin-top:22px">
+      <div class="card-title">Account</div>
+      <p class="hint" id="s-account"></p>
+      <div class="btn-row"><button class="btn btn-ghost" onclick="doLogout()">Sign Out</button></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ====== EDIT READING ====== -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <h2 id="edit-title">Reading</h2>
+    <div class="modal-photos" id="edit-photos"></div>
+    <div class="field">
+      <label class="label" for="e-customer">Who it's for</label>
+      <input type="text" id="e-customer" autocomplete="off">
+    </div>
+    <div class="field">
+      <span class="label">Start or end?</span>
+      <div class="toggle">
+        <button type="button" id="e-kind-start" onclick="setEditKind('start')">Start</button>
+        <button type="button" id="e-kind-end" onclick="setEditKind('end')">End</button>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label" for="e-when">Date &amp; time</label>
+      <input type="datetime-local" id="e-when">
+    </div>
+    <div class="numbers">
+      <div class="field"><label class="label" for="e-electric">⚡ Electric kWh</label><input type="text" inputmode="decimal" id="e-electric"></div>
+      <div class="field"><label class="label" for="e-gas">🔥 Gas</label><input type="text" inputmode="decimal" id="e-gas"></div>
+      <div class="field"><label class="label" for="e-hours">⏱ Dryer hours</label><input type="text" inputmode="decimal" id="e-hours"></div>
+      <div class="field"><label class="label" for="e-batches">🌾 Batch</label><input type="text" inputmode="decimal" id="e-batches"></div>
+    </div>
+    <div class="field">
+      <label class="label" for="e-note">Note</label>
+      <input type="text" id="e-note">
+    </div>
+    <div class="hint" id="e-by" style="margin-bottom:14px"></div>
+    <div class="btn-row">
+      <button class="btn btn-green" onclick="saveEdit()">Save</button>
+      <button class="btn btn-ghost" onclick="closeEdit()">Cancel</button>
+    </div>
+    <div class="btn-row"><button class="btn btn-danger btn-sm" onclick="deleteEdit()">Delete this reading</button></div>
+  </div>
+</div>
+
+<div class="photo-full" id="photo-full" onclick="this.classList.remove('open')"><img alt="Meter photo"></div>
+
+<script>
+// ===================== CONFIG =====================
+// Same Firebase project and accounts as Field Records (../index.html).
+var FIREBASE_CONFIG = {
+  apiKey:      "AIzaSyARcHHdW0NJSiMPUrW2nU8uOBftgjyWupk",
+  databaseURL: "https://shopping-list-app-d077b-default-rtdb.firebaseio.com"
+};
+var DB_URL   = FIREBASE_CONFIG.databaseURL;
+var API_KEY  = FIREBASE_CONFIG.apiKey;
+var AUTH_URL = 'https://identitytoolkit.googleapis.com/v1/accounts';
+var ROOT     = 'grainDrying';          // shared by every approved user
+
+var CLAUDE_MODEL = 'claude-opus-5-5';
+
+var SLOTS = [
+  { key: 'electric', name: 'Electric', icon: '⚡' },
+  { key: 'gas',      name: 'Gas',      icon: '🔥' },
+  { key: 'dryer',    name: 'Dryer',    icon: '⏱' }
+];
+var FIELDS = ['electric', 'gas', 'hours', 'batches'];
+
+// ===================== STATE =====================
+var currentUser = null, idToken = null, tokenExpiry = 0, refreshPromise = null;
+var serverReadings = {};      // id -> reading, last copy from the server (no photos)
+var settings = {};            // shared settings from the server
+var outbox = [];              // changes not yet on the server: {opId, type:'put'|'delete', reading, photos}
+var flushing = false;
+var form = null;              // the New Reading form being filled in
+var editing = null;           // reading open in the edit modal
+
+// ===================== SMALL HELPERS =====================
+function $(id) { return document.getElementById(id); }
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function(ch) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
+  });
+}
+function newId(prefix) { return (prefix || '') + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function num(v) {
+  if (v === null || v === undefined) return null;
+  var s = String(v).replace(/,/g, '').trim();
+  if (s === '') return null;
+  var n = Number(s);
+  return isFinite(n) ? n : null;
+}
+function fmtNum(n, dp) {
+  if (n === null || n === undefined || n === '') return '—';
+  return Number(n).toLocaleString('en-US', { maximumFractionDigits: dp == null ? 2 : dp });
+}
+function fmtWhen(ts) {
+  var d = new Date(ts);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+         d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+function sameName(a, b) { return (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase(); }
+function gasUnit() { return settings.gasUnit || 'ft³'; }
+function mult(v) { var n = num(v); return n && n > 0 ? n : 1; }
+
+function setIndicator(text, autoHide) {
+  var el = $('save-indicator');
+  clearTimeout(el._t);
+  el.textContent = text;
+  el.style.color = text.charAt(0) === '⚠' ? '#e8a8a3' : '';
+  el.style.opacity = text ? '1' : '0';
+  if (autoHide) el._t = setTimeout(function(){ el.style.opacity = '0'; }, 2000);
+}
+
+// ===================== DEVICE STORAGE (IndexedDB) =====================
+// Photos are too big for localStorage, so the outbox and the unfinished form live here.
+var idb = null;
+function idbOpen() {
+  if (idb) return idb;
+  idb = new Promise(function(resolve, reject) {
+    var req = indexedDB.open('grain-drying', 1);
+    req.onupgradeneeded = function() { req.result.createObjectStore('kv'); };
+    req.onsuccess = function() { resolve(req.result); };
+    req.onerror = function() { reject(req.error); };
+  });
+  return idb;
+}
+function idbGet(key) {
+  return idbOpen().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var r = db.transaction('kv').objectStore('kv').get(key);
+      r.onsuccess = function() { resolve(r.result); };
+      r.onerror = function() { reject(r.error); };
+    });
+  });
+}
+function idbSet(key, val) {
+  return idbOpen().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction('kv', 'readwrite');
+      if (val === undefined) tx.objectStore('kv').delete(key); else tx.objectStore('kv').put(val, key);
+      tx.oncomplete = function() { resolve(); };
+      tx.onerror = function() { reject(tx.error); };
+    });
+  });
+}
+function userKey(k) { return k + ':' + currentUser.uid; }
+
+// ===================== AUTH (Firebase REST, shared with Field Records) =====================
+function readSession() {
+  try { return JSON.parse(localStorage.getItem('fr_session') || 'null'); } catch(e) { return null; }
+}
+function writeSession(s) {
+  try { localStorage.setItem('fr_session', JSON.stringify(s)); } catch(e) {}
+}
+
+function ensureToken() {
+  if (idToken && Date.now() < tokenExpiry - 5 * 60 * 1000) return Promise.resolve();
+  var sess = readSession();
+  if (!sess || !sess.refreshToken) { var e = new Error('No session'); e.auth = true; return Promise.reject(e); }
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = fetch('https://securetoken.googleapis.com/v1/token?key=' + API_KEY, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: sess.refreshToken })
+  }).then(function(r){ return r.json(); }).then(function(d) {
+    if (!d.id_token) { var e = new Error((d.error && d.error.message) || 'Token refresh failed'); e.auth = true; throw e; }
+    idToken = d.id_token;
+    tokenExpiry = Date.now() + (parseInt(d.expires_in, 10) || 3600) * 1000;
+    var s = readSession() || {};
+    s.idToken = d.id_token; s.refreshToken = d.refresh_token; s.tokenExpiry = tokenExpiry;
+    writeSession(s);
+  });
+  var clear = function(){ refreshPromise = null; };
+  refreshPromise.then(clear, clear);
+  return refreshPromise;
+}
+
+function authRequest(endpoint, body, busyText, onOk) {
+  var err = $('auth-error');
+  err.textContent = busyText;
+  fetch(AUTH_URL + ':' + endpoint + '?key=' + API_KEY, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+  }).then(function(r){ return r.json(); }).then(function(d) {
+    if (d.error) { err.textContent = d.error.message.replace(/_/g, ' ').toLowerCase(); return; }
+    onOk(d);
+  }).catch(function(){ err.textContent = 'Network error. Check connection.'; });
+}
+function signIn(endpoint) {
+  var email = $('auth-email').value.trim(), pass = $('auth-pass').value;
+  if (!email || !pass) { $('auth-error').textContent = 'Enter email and password.'; return; }
+  authRequest(endpoint, { email: email, password: pass, returnSecureToken: true },
+    endpoint === 'signUp' ? 'Creating account...' : 'Signing in...', function(d) {
+      idToken = d.idToken;
+      tokenExpiry = Date.now() + (parseInt(d.expiresIn, 10) || 3600) * 1000;
+      currentUser = { uid: d.localId, email: d.email };
+      writeSession({ user: currentUser, idToken: d.idToken, refreshToken: d.refreshToken, tokenExpiry: tokenExpiry });
+      $('auth-error').textContent = '';
+      $('auth-pass').value = '';
+      startApp();
+    });
+}
+function doLogin()    { signIn('signInWithPassword'); }
+function doRegister() { signIn('signUp'); }
+function doResetPassword() {
+  var email = $('auth-email').value.trim();
+  if (!email) { $('auth-error').textContent = 'Enter your email above first.'; return; }
+  authRequest('sendOobCode', { requestType: 'PASSWORD_RESET', email: email }, 'Sending reset email...',
+    function(){ $('auth-error').textContent = 'Reset email sent — check your inbox.'; });
+}
+function doLogout() {
+  if (outbox.length && !confirm(outbox.length + ' reading(s) have not uploaded yet. They stay on this phone and upload next time you sign in here. Sign out anyway?')) return;
+  if (!confirm('Sign out? (This also signs you out of Field Records on this phone.)')) return;
+  localStorage.removeItem('fr_session');
+  currentUser = null; idToken = null; tokenExpiry = 0;
+  showScreen('auth');
+}
+
+function showScreen(which) {
+  $('auth-screen').style.display    = which === 'auth' ? 'flex' : 'none';
+  $('blocked-screen').style.display = which === 'blocked' ? 'flex' : 'none';
+  $('app-screen').style.display     = which === 'app' ? 'block' : 'none';
+}
+
+// ===================== FIREBASE DATA (REST) =====================
+function dbUrl(path) { return DB_URL + '/' + ROOT + '/' + path + '.json?auth=' + idToken; }
+
+// Resolves with the parsed body. Rejects with err.denied when this account isn't on the member list.
+function dbRequest(method, path, body, retried) {
+  return ensureToken().then(function() {
+    var opts = { method: method };
+    if (body !== undefined) { opts.headers = {'Content-Type': 'application/json'}; opts.body = JSON.stringify(body); }
+    return fetch(dbUrl(path), opts);
+  }).then(function(r) {
+    return r.json().catch(function(){ return null; }).then(function(val) {
+      if (r.ok) return val;
+      if (r.status === 401 && !retried && val && /expired/i.test(val.error || '')) {
+        tokenExpiry = 0;
+        return dbRequest(method, path, body, true);
+      }
+      var e = new Error((val && val.error) || ('HTTP ' + r.status));
+      e.status = r.status;
+      e.denied = r.status === 401 && /permission/i.test((val && val.error) || '');
+      throw e;
+    });
+  });
+}
+
+function cacheKey() { return 'gd_cache_' + currentUser.uid; }
+function readCache() {
+  try { return JSON.parse(localStorage.getItem(cacheKey()) || 'null'); } catch(e) { return null; }
+}
+function writeCache() {
+  try { localStorage.setItem(cacheKey(), JSON.stringify({ readings: serverReadings, settings: settings })); } catch(e) {}
+}
+
+function startApp() {
+  var sess = readSession();
+  if (!sess || !sess.user || !sess.refreshToken) { showScreen('auth'); return; }
+  currentUser = sess.user;
+  idToken = sess.idToken;
+  tokenExpiry = sess.tokenExpiry || 0;
+
+  var cached = readCache();
+  if (cached) { serverReadings = cached.readings || {}; settings = cached.settings || {}; }
+  showScreen('app');
+  $('s-account').textContent = 'Signed in as ' + currentUser.email;
+
+  Promise.all([idbGet(userKey('outbox')), idbGet(userKey('draft'))]).then(function(res) {
+    outbox = res[0] || [];
+    if (!form) { form = restoreDraft(res[1]); renderForm(); }
+    renderAll();
+    loadFromServer();
+  }).catch(function(e) {
+    console.error(e);
+    if (!form) { form = blankForm(); renderForm(); }
+    renderAll();
+    loadFromServer();
+  });
+}
+
+function loadFromServer() {
+  if (!currentUser) return;
+  setIndicator('↻ Loading...');
+  Promise.all([dbRequest('GET', 'readings'), dbRequest('GET', 'settings')]).then(function(res) {
+    serverReadings = res[0] || {};
+    settings = res[1] || {};
+    writeCache();
+    renderAll();
+    setIndicator('✓ Up to date', true);
+    flushOutbox();
+  }).catch(function(e) {
+    console.error('Load error:', e);
+    if (e.denied) {
+      $('blocked-email').textContent = currentUser.email;
+      $('blocked-uid').textContent = currentUser.uid;
+      showScreen('blocked');
+      return;
+    }
+    if (e.auth) { setIndicator('⚠ Signed out'); showScreen('auth'); return; }
+    setIndicator(navigator.onLine ? '⚠ Could not load — showing saved copy' : '⚠ Offline — showing saved copy');
+  });
+}
+
+// ===================== OUTBOX (works without signal) =====================
+function queue(op) {
+  op.opId = newId('op_');
+  outbox.push(op);
+  return idbSet(userKey('outbox'), outbox).then(function() { renderAll(); flushOutbox(); });
+}
+
+function flushOutbox() {
+  if (flushing || !outbox.length || !currentUser) return;
+  flushing = true;
+  setIndicator('↑ Uploading ' + outbox.length + '...');
+  var op = outbox[0];
+  var steps;
+  if (op.type === 'put') {
+    var photoIds = Object.keys(op.photos || {});
+    steps = photoIds.reduce(function(p, pid) {
+      return p.then(function(){ return dbRequest('PUT', 'photos/' + pid, op.photos[pid]); });
+    }, Promise.resolve()).then(function() {
+      return dbRequest('PUT', 'readings/' + op.reading.id, op.reading);
+    }).then(function() { serverReadings[op.reading.id] = op.reading; });
+  } else {
+    var pids = Object.keys(op.photoIds || {}).map(function(k){ return op.photoIds[k]; });
+    steps = dbRequest('DELETE', 'readings/' + op.id).then(function() {
+      return Promise.all(pids.map(function(pid){ return dbRequest('DELETE', 'photos/' + pid); }));
+    }).then(function() { delete serverReadings[op.id]; });
+  }
+  steps.then(function() {
+    outbox = outbox.filter(function(o){ return o.opId !== op.opId; });
+    writeCache();
+    return idbSet(userKey('outbox'), outbox);
+  }).then(function() {
+    flushing = false;
+    renderAll();
+    if (outbox.length) flushOutbox(); else setIndicator('✓ Saved', true);
+  }).catch(function(e) {
+    flushing = false;
+    console.error('Upload error:', e);
+    if (e.denied) { setIndicator('⚠ No access — saved on this phone'); return; }
+    setIndicator(navigator.onLine ? '⚠ Upload failed — will retry' : '⚠ Offline — saved on this phone');
+  });
+}
+
+window.addEventListener('online', function(){ if (currentUser) { flushOutbox(); loadFromServer(); } });
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible' && currentUser && $('app-screen').style.display !== 'none') loadFromServer();
+});
+
+// Server copy with this phone's not-yet-uploaded changes laid on top.
+function allReadings() {
+  var out = {};
+  Object.keys(serverReadings).forEach(function(k){ out[k] = serverReadings[k]; });
+  var pending = {};
+  outbox.forEach(function(op) {
+    if (op.type === 'put') { out[op.reading.id] = op.reading; pending[op.reading.id] = true; }
+    else delete out[op.id];
+  });
+  return Object.keys(out).map(function(k) {
+    var r = Object.assign({}, out[k]);
+    r._pending = !!pending[k];
+    return r;
+  }).sort(function(a, b){ return a.ts - b.ts; });
+}
+
+// ===================== READING PHOTOS WITH CLAUDE =====================
+var READ_PROMPT = [
+  'This photo was taken at a farm grain dryer for record keeping. Decide what it shows and read the numbers exactly as displayed.',
+  '',
+  'photo_type:',
+  '- "electric_meter": an electricity meter. Put the main cumulative kWh reading in electric_kwh. For dial meters, read each dial in order; when a pointer sits between two digits use the lower digit. Ignore serial numbers, barcodes, "Kh", voltage/amp ratings and multiplier text.',
+  '- "gas_meter": a natural gas or propane meter. Put the main cumulative index (odometer wheels or dials) in gas. Ignore small test dials, serial numbers and pressure gauges. Only include decimals if the meter shows a decimal point or marks the last wheel(s) as decimals.',
+  '- "dryer_screen": a grain dryer control panel or display. Put the total run hours in dryer_hours and the batch count or batch amount shown on the screen in batches.',
+  '- "other": none of the above.',
+  '',
+  'Set every number that is not shown in this photo to null. Never guess a digit: if any digit of a number cannot be read, set that number to null.',
+  'note: one short sentence for the farmer, e.g. "Clear reading." or "Last digit is blurry — please check."'
+].join('\n');
+
+var READ_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['photo_type', 'electric_kwh', 'gas', 'dryer_hours', 'batches', 'note'],
+  properties: {
+    photo_type:   { type: 'string', enum: ['electric_meter', 'gas_meter', 'dryer_screen', 'other'] },
+    electric_kwh: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    gas:          { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    dryer_hours:  { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    batches:      { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    note:         { type: 'string' }
+  }
+};
+
+function readPhotoWithClaude(dataUrl) {
+  if (!settings.claudeKey) return Promise.reject(new Error('No Claude API key set — add one in Settings'));
+  return fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': settings.claudeKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'server-side-fallback-2026-07-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: 16000,
+      fallbacks: 'default',
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: READ_SCHEMA } },
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: dataUrl.split(',')[1] } },
+        { type: 'text', text: READ_PROMPT }
+      ]}]
+    })
+  }).then(function(r) {
+    return r.json().then(function(d) {
+      if (!r.ok) {
+        var msg = (d && d.error && d.error.message) || ('HTTP ' + r.status);
+        if (r.status === 401) msg = 'The Claude API key was rejected — check it in Settings';
+        throw new Error(msg);
+      }
+      if (d.stop_reason === 'refusal') throw new Error('Claude declined to read this photo');
+      if (d.stop_reason === 'max_tokens') throw new Error('Reading was cut off — try again');
+      var text = (d.content || []).filter(function(b){ return b.type === 'text'; }).map(function(b){ return b.text; }).join('');
+      return JSON.parse(text);
+    });
+  });
+}
+
+var TYPE_TO_SLOT = { electric_meter: 'electric', gas_meter: 'gas', dryer_screen: 'dryer' };
+
+// ===================== IMAGES =====================
+// Returns { read: big JPEG for Claude, keep: smaller JPEG stored with the record }.
+function prepareImage(file) {
+  return new Promise(function(resolve, reject) {
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function() {
+      function scaled(maxSide, quality) {
+        var s = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+        var c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * s);
+        c.height = Math.round(img.naturalHeight * s);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        return c.toDataURL('image/jpeg', quality);
+      }
+      var out = { read: scaled(1600, 0.85), keep: scaled(1100, 0.65) };
+      URL.revokeObjectURL(url);
+      resolve(out);
+    };
+    img.onerror = function() { URL.revokeObjectURL(url); reject(new Error("Couldn't open that picture")); };
+    img.src = url;
+  });
+}
+
+// ===================== NEW READING FORM =====================
+function blankForm() {
+  return { customer: '', kind: '', kindChosen: false, note: '',
+           values: { electric: '', gas: '', hours: '', batches: '' },
+           fromPhoto: {}, photos: {}, reading: 0 };
+}
+
+// A form saved while photos were being read (app closed mid-read) can't finish that read.
+function restoreDraft(d) {
+  if (!d) return blankForm();
+  d.reading = 0;
+  Object.keys(d.photos || {}).forEach(function(k) {
+    if (d.photos[k].status === 'reading') { d.photos[k].status = 'error'; d.photos[k].note = 'Reading was interrupted — check the numbers.'; }
+  });
+  return d;
+}
+
+var draftTimer = null;
+function saveDraft() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(function() {
+    if (currentUser && form) idbSet(userKey('draft'), form).catch(function(){});
+  }, 300);
+}
+
+var targetSlot = null;   // set when a tile is tapped so the next photo goes in that tile
+
+function renderForm() {
+  var box = $('shots');
+  box.innerHTML = '';
+  SLOTS.forEach(function(s) {
+    var p = form.photos[s.key];
+    var d = document.createElement('div');
+    d.className = 'shot' + (p ? ' filled' : '');
+    var html = '';
+    if (p) {
+      html += '<img src="' + p.keep + '" alt="">';
+      var cls = p.status === 'ok' ? 'ok' : (p.status === 'error' ? 'bad' : '');
+      var label = p.status === 'reading' ? '<span class="spin"></span> reading'
+                : p.status === 'ok' ? '✓ ' + s.name
+                : p.status === 'error' ? '⚠ type it in' : s.name;
+      html += '<div class="tag ' + cls + '">' + label + '</div>';
+      html += '<button class="remove" type="button" aria-label="Remove photo">✕</button>';
+    } else {
+      html += '<div class="icon">' + s.icon + '</div><div class="name">' + s.name + '</div>';
+    }
+    d.innerHTML = html;
+    d.addEventListener('click', function(e) {
+      if (e.target.classList.contains('remove')) {
+        delete form.photos[s.key];
+        renderForm(); saveDraft();
+        return;
+      }
+      if (p) { openPhoto(p.keep); return; }
+      targetSlot = s.key;
+      $('cam-input').click();
+    });
+    box.appendChild(d);
+  });
+
+  FIELDS.forEach(function(f) {
+    var el = $('v-' + f);
+    if (document.activeElement !== el) el.value = form.values[f];
+    el.classList.toggle('from-photo', !!form.fromPhoto[f]);
+  });
+  if (document.activeElement !== $('v-customer')) $('v-customer').value = form.customer;
+  if (document.activeElement !== $('v-note')) $('v-note').value = form.note;
+  $('gas-label').textContent = '🔥 Gas (' + gasUnit() + ')';
+  renderKind();
+  renderCustomerSuggest();
+  renderReadStatus();
+}
+
+function renderReadStatus() {
+  var el = $('read-status');
+  var lines = [], warn = !!form.message;
+  if (form.reading > 0) lines.push('<span class="spin"></span> Reading ' + form.reading + ' photo' + (form.reading > 1 ? 's' : '') + '...');
+  SLOTS.forEach(function(s) {
+    var p = form.photos[s.key];
+    if (p && p.note) lines.push(esc(s.name + ': ' + p.note));
+    if (p && p.status === 'error') warn = true;
+  });
+  if (form.message) lines.push(esc(form.message));
+  el.innerHTML = lines.join('<br>');
+  el.className = 'hint' + (warn ? ' warn' : '');
+}
+
+function handleFiles(files, forcedSlot) {
+  files = Array.prototype.slice.call(files || []);
+  if (!files.length) return;
+  form.message = '';
+  files.forEach(function(file, i) {
+    var slot = i === 0 ? forcedSlot : null;
+    form.reading++;
+    renderReadStatus();
+    prepareImage(file).then(function(img) {
+      if (!navigator.onLine || !settings.claudeKey) {
+        var s = slot || firstEmptySlot();
+        if (!s) { form.message = 'All three photo spots are full — tap ✕ on one to replace it.'; return; }
+        form.photos[s] = { keep: img.keep, status: 'error',
+          note: !settings.claudeKey ? 'No Claude key in Settings — type the numbers in.' : 'No signal — type the numbers in.' };
+        return;
+      }
+      // Show the photo right away in its tile (or a free one) while Claude reads it.
+      var tmp = slot || firstEmptySlot();
+      if (tmp) form.photos[tmp] = { keep: img.keep, status: 'reading' };
+      renderForm();
+      return readPhotoWithClaude(img.read).then(function(res) {
+        var s = slot || TYPE_TO_SLOT[res.photo_type] || tmp;
+        if (tmp && tmp !== s && form.photos[tmp] && form.photos[tmp].keep === img.keep) delete form.photos[tmp];
+        if (!s) { form.message = "Couldn't tell what one photo was — tap a tile to retake it."; return; }
+        var got = { electric: res.electric_kwh, gas: res.gas, hours: res.dryer_hours, batches: res.batches };
+        var any = false;
+        FIELDS.forEach(function(f) {
+          if (got[f] !== null && got[f] !== undefined) {
+            form.values[f] = String(got[f]); form.fromPhoto[f] = true; any = true;
+          }
+        });
+        form.photos[s] = { keep: img.keep, status: any ? 'ok' : 'error',
+                           note: res.photo_type === 'other' ? "This doesn't look like a meter or the dryer screen." : res.note };
+      }).catch(function(e) {
+        console.error('Read error:', e);
+        if (tmp) form.photos[tmp] = { keep: img.keep, status: 'error', note: e.message + ' — type the numbers in.' };
+      });
+    }).catch(function(e) {
+      form.message = e.message;
+    }).then(function() {
+      form.reading = Math.max(0, form.reading - 1);
+      renderForm(); saveDraft();
+    });
+  });
+}
+function firstEmptySlot() {
+  for (var i = 0; i < SLOTS.length; i++) if (!form.photos[SLOTS[i].key]) return SLOTS[i].key;
+  return null;
+}
+
+$('cam-input').addEventListener('change', function() {
+  var slot = targetSlot; targetSlot = null;
+  handleFiles(this.files, slot);
+  this.value = '';
+});
+$('gallery-input').addEventListener('change', function() {
+  handleFiles(this.files, null);
+  this.value = '';
+});
+// The big button means "work out what this is", not the last tile tapped.
+document.querySelector('label[for="cam-input"]').addEventListener('click', function(){ targetSlot = null; });
+
+FIELDS.forEach(function(f) {
+  $('v-' + f).addEventListener('input', function() {
+    form.values[f] = this.value; form.fromPhoto[f] = false;
+    this.classList.remove('from-photo');
+    saveDraft();
+  });
+});
+$('v-customer').addEventListener('input', function() {
+  form.customer = this.value;
+  renderKind(); renderCustomerSuggest(); saveDraft();
+});
+$('v-note').addEventListener('input', function() { form.note = this.value; saveDraft(); });
+
+// ---- who it's for ----
+function customerNames() {
+  var seen = {}, names = [];
+  allReadings().slice().reverse().forEach(function(r) {
+    var k = (r.customer || '').trim().toLowerCase();
+    if (k && !seen[k]) { seen[k] = true; names.push(r.customer.trim()); }
+  });
+  return names;   // most recently used first
+}
+function renderCustomerSuggest() {
+  var q = form.customer.trim().toLowerCase();
+  var names = customerNames().filter(function(n) {
+    var l = n.toLowerCase();
+    return l !== q && (!q || l.indexOf(q) !== -1);
+  }).slice(0, 10);
+  var box = $('customer-suggest');
+  box.innerHTML = '';
+  names.forEach(function(n) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.textContent = n;
+    b.addEventListener('click', function() {
+      form.customer = n; $('v-customer').value = n;
+      renderKind(); renderCustomerSuggest(); saveDraft();
+    });
+    box.appendChild(b);
+  });
+}
+
+// The open (started, not ended) job for a name, if any.
+function openStart(name, excludeId) {
+  var open = null;
+  allReadings().forEach(function(r) {
+    if (r.id === excludeId || !sameName(r.customer, name)) return;
+    if (r.kind === 'start') open = r;
+    else if (r.kind === 'end') open = null;
+  });
+  return open;
+}
+
+function setKind(k, chosen) {
+  form.kind = k;
+  if (chosen) form.kindChosen = true;
+  renderKind(); saveDraft();
+}
+function renderKind() {
+  var name = form.customer.trim();
+  var open = name ? openStart(name) : null;
+  // Until someone taps Start/End, guess from the log: open job -> End, otherwise Start.
+  if (!form.kindChosen) form.kind = name ? (open ? 'end' : 'start') : '';
+  $('kind-start').className = form.kind === 'start' ? 'on-start' : '';
+  $('kind-end').className   = form.kind === 'end' ? 'on-end' : '';
+  var hint = $('customer-hint');
+  hint.className = 'hint';
+  if (!name) { hint.textContent = ''; return; }
+  if (open && form.kind === 'start') {
+    hint.className = 'hint warn';
+    hint.textContent = name + ' already has a job started ' + fmtWhen(open.ts) + ' with no end yet.';
+  } else if (open) {
+    hint.textContent = 'Ends the job started ' + fmtWhen(open.ts) + '.';
+  } else if (form.kind === 'end') {
+    hint.className = 'hint warn';
+    hint.textContent = 'No start reading found for ' + name + '.';
+  } else {
+    hint.textContent = 'Starts a new drying job for ' + name + '.';
+  }
+}
+
+function clearForm(ask) {
+  if (ask && !confirm('Clear the photos and numbers?')) return;
+  form = blankForm();
+  idbSet(userKey('draft'), undefined).catch(function(){});
+  renderForm();
+}
+
+function saveNew() {
+  if (form.reading > 0) { alert('Still reading photos — give it a few seconds.'); return; }
+  var customer = form.customer.trim();
+  if (!customer) { alert("Type who it's for."); $('v-customer').focus(); return; }
+  if (!form.kind) { alert('Tap Start or End.'); return; }
+  var vals = {}, bad = [];
+  FIELDS.forEach(function(f) {
+    var raw = form.values[f];
+    var n = num(raw);
+    if (String(raw || '').trim() && n === null) bad.push(f);
+    vals[f] = n;
+  });
+  if (bad.length) { alert('These numbers look wrong: ' + bad.join(', ')); return; }
+  if (FIELDS.every(function(f){ return vals[f] === null; })) { alert('Take a picture or type at least one number.'); return; }
+
+  if (form.kind === 'end') {
+    var start = openStart(customer);
+    if (start) {
+      var lower = FIELDS.filter(function(f){ return vals[f] !== null && start[f] != null && vals[f] < start[f]; });
+      if (lower.length && !confirm('These are LOWER than the start reading: ' + lower.join(', ') + '. Save anyway?')) return;
+    }
+  }
+
+  var reading = {
+    id: newId('r_'), ts: Date.now(), customer: customer, kind: form.kind,
+    electric: vals.electric, gas: vals.gas, hours: vals.hours, batches: vals.batches,
+    note: form.note.trim(), by: currentUser.email, photos: {}
+  };
+  var photos = {};
+  SLOTS.forEach(function(s) {
+    var p = form.photos[s.key];
+    if (p) { var pid = newId('p_'); reading.photos[s.key] = pid; photos[pid] = p.keep; }
+  });
+  queue({ type: 'put', reading: reading, photos: photos }).then(function() {
+    clearForm(false);
+    var msg = $('read-status');
+    msg.className = 'hint';
+    msg.style.color = '#a8d99e';
+    msg.textContent = '✓ Saved ' + customer + ' ' + reading.kind.toUpperCase() +
+      (navigator.onLine ? '' : ' on this phone — it uploads when there is signal');
+    setTimeout(function(){ msg.style.color = ''; if (form && !form.reading && !form.message) renderReadStatus(); }, 6000);
+    window.scrollTo(0, 0);
+  }).catch(function(e) {
+    alert("Couldn't save on this phone: " + e.message);
+  });
+}
+
+// ===================== LOG =====================
+// Pairs each END with the latest unmatched START for the same name.
+function buildJobs(readings) {
+  var openByName = {}, jobs = [];
+  readings.forEach(function(r) {
+    var k = (r.customer || '').trim().toLowerCase();
+    if (r.kind === 'start') {
+      var job = { customer: r.customer, start: r, end: null };
+      jobs.push(job);
+      if (openByName[k]) openByName[k].superseded = true;
+      openByName[k] = job;
+    } else {
+      var j = openByName[k];
+      if (j) { j.end = r; openByName[k] = null; }
+      else jobs.push({ customer: r.customer, start: null, end: r });
+    }
+  });
+  jobs.forEach(function(j) {
+    if (!j.start || !j.end) return;
+    j.used = {
+      electric: diff(j.start.electric, j.end.electric, mult(settings.elecMult)),
+      gas:      diff(j.start.gas, j.end.gas, mult(settings.gasMult)),
+      hours:    diff(j.start.hours, j.end.hours, 1),
+      batches:  diff(j.start.batches, j.end.batches, 1)
+    };
+  });
+  return jobs;
+}
+function diff(a, b, m) {
+  if (a === null || a === undefined || b === null || b === undefined) return null;
+  return Math.round((b - a) * m * 1000) / 1000;
+}
+function jobTime(j) { return (j.end || j.start).ts; }
+
+function renderLog() {
+  var readings = allReadings();
+  var years = {};
+  readings.forEach(function(r){ years[new Date(r.ts).getFullYear()] = true; });
+  years[new Date().getFullYear()] = true;
+  var ySel = $('f-year'), yPrev = ySel.value;
+  var yList = Object.keys(years).sort().reverse();
+  ySel.innerHTML = yList.map(function(y){ return '<option>' + y + '</option>'; }).join('') + '<option value="all">All years</option>';
+  ySel.value = yPrev && (yList.indexOf(yPrev) !== -1 || yPrev === 'all') ? yPrev : yList[0];
+
+  var cSel = $('f-customer'), cPrev = cSel.value;
+  var names = customerNames().sort(function(a, b){ return a.localeCompare(b); });
+  cSel.innerHTML = '<option value="">Everyone</option>' + names.map(function(n){ return '<option>' + esc(n) + '</option>'; }).join('');
+  cSel.value = names.indexOf(cPrev) !== -1 ? cPrev : '';
+
+  var year = ySel.value, who = cSel.value;
+  var jobs = buildJobs(readings).filter(function(j) {
+    var t = j.start ? j.start.ts : j.end.ts;
+    return (year === 'all' || new Date(t).getFullYear() === Number(year)) && (!who || sameName(j.customer, who));
+  });
+
+  // Totals per person
+  var totals = {}, order = [];
+  jobs.forEach(function(j) {
+    var k = j.customer.trim().toLowerCase();
+    if (!totals[k]) { totals[k] = { name: j.customer.trim(), jobs: 0, electric: 0, gas: 0, hours: 0, batches: 0 }; order.push(k); }
+    var t = totals[k];
+    if (j.used) {
+      t.jobs++;
+      FIELDS.forEach(function(f){ if (j.used[f] !== null) t[f] += j.used[f]; });
+    }
+  });
+  if (!order.length) {
+    $('totals').innerHTML = '';
+  } else {
+    order.sort(function(a, b){ return totals[a].name.localeCompare(totals[b].name); });
+    $('totals').innerHTML = '<h3 class="sec" style="margin-top:4px">Totals</h3><div class="card table-wrap"><table class="totals"><tr>' +
+      '<th>Who</th><th>Jobs</th><th>kWh</th><th>Gas ' + esc(gasUnit()) + '</th><th>Hours</th><th>Batch</th></tr>' +
+      order.map(function(k) {
+        var t = totals[k];
+        return '<tr><td>' + esc(t.name) + '</td><td>' + t.jobs + '</td><td>' + fmtNum(t.electric) + '</td><td>' +
+          fmtNum(t.gas) + '</td><td>' + fmtNum(t.hours) + '</td><td>' + fmtNum(t.batches) + '</td></tr>';
+      }).join('') + '</table></div><p class="hint">Totals count finished jobs (a start and an end).</p>';
+  }
+
+  var box = $('jobs');
+  if (!jobs.length) { box.innerHTML = '<div class="empty">No readings yet.<br>Take a picture on the 📷 New tab.</div>'; return; }
+  jobs.sort(function(a, b){ return jobTime(b) - jobTime(a); });
+  box.innerHTML = jobs.map(function(j) {
+    var badges = '';
+    if (!j.end) badges += '<span class="badge open">' + (j.superseded ? 'no end' : 'in progress') + '</span>';
+    if (!j.start) badges += '<span class="badge warn">no start</span>';
+    var chips = '';
+    if (j.used) {
+      chips = '<div class="chips">' +
+        usedChip('⚡', j.used.electric, 'kWh') + usedChip('🔥', j.used.gas, gasUnit()) +
+        usedChip('⏱', j.used.hours, 'hr') + usedChip('🌾', j.used.batches, 'batch') + '</div>';
+    }
+    return '<div class="card"><div class="card-title">' + esc(j.customer) + badges + '</div>' + chips +
+      lineHtml(j.start, 'start') + lineHtml(j.end, 'end') + '</div>';
+  }).join('');
+}
+function usedChip(icon, v, unit) {
+  if (v === null) return '';
+  return '<span class="chip' + (v < 0 ? ' neg' : '') + '">' + icon + ' ' + fmtNum(v) + ' ' + esc(unit) + (v < 0 ? ' ⚠' : '') + '</span>';
+}
+function lineHtml(r, kind) {
+  if (!r) return '';
+  var nPhotos = Object.keys(r.photos || {}).length;
+  return '<div class="row-line" onclick="openEdit(\'' + r.id + '\')">' +
+    '<div class="kind ' + kind + '">' + kind + '</div>' +
+    '<div class="vals"><div class="when">' + fmtWhen(r.ts) + ' · ' + esc((r.by || '').split('@')[0]) +
+      (nPhotos ? ' · 📷' + nPhotos : '') + (r._pending ? ' <span class="badge pending">not uploaded</span>' : '') + '</div>' +
+      '⚡ ' + fmtNum(r.electric) + ' · 🔥 ' + fmtNum(r.gas) + ' · ⏱ ' + fmtNum(r.hours) + ' · 🌾 ' + fmtNum(r.batches) +
+      (r.note ? '<div class="when">' + esc(r.note) + '</div>' : '') +
+    '</div><div class="arrow">›</div></div>';
+}
+
+// ===================== EDIT / VIEW A READING =====================
+function findReading(id) {
+  return allReadings().filter(function(r){ return r.id === id; })[0];
+}
+function toLocalInput(ts) {
+  var d = new Date(ts);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
+function openEdit(id) {
+  var r = findReading(id);
+  if (!r) return;
+  editing = { id: id, kind: r.kind };
+  $('edit-title').textContent = r.customer + ' — ' + r.kind;
+  $('e-customer').value = r.customer || '';
+  $('e-when').value = toLocalInput(r.ts);
+  FIELDS.forEach(function(f){ $('e-' + f).value = r[f] == null ? '' : r[f]; });
+  $('e-note').value = r.note || '';
+  $('e-by').textContent = 'Saved by ' + (r.by || 'unknown') + (r._pending ? ' · not uploaded yet' : '');
+  setEditKind(r.kind);
+  renderEditPhotos(r);
+  $('edit-modal').classList.add('open');
+}
+function setEditKind(k) {
+  editing.kind = k;
+  $('e-kind-start').className = k === 'start' ? 'on-start' : '';
+  $('e-kind-end').className   = k === 'end' ? 'on-end' : '';
+}
+function closeEdit() { $('edit-modal').classList.remove('open'); editing = null; }
+
+function renderEditPhotos(r) {
+  var box = $('edit-photos');
+  var slots = SLOTS.filter(function(s){ return r.photos && r.photos[s.key]; });
+  if (!slots.length) { box.innerHTML = ''; return; }
+  box.innerHTML = slots.map(function(s) {
+    return '<a href="#" data-pid="' + r.photos[s.key] + '"><span>' + s.icon + ' ' + s.name + '</span></a>';
+  }).join('');
+  box.querySelectorAll('a').forEach(function(a) {
+    var pid = a.getAttribute('data-pid');
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      var img = a.querySelector('img');
+      if (img) openPhoto(img.src);
+    });
+    loadPhoto(pid).then(function(src) {
+      if (!src) return;
+      var img = document.createElement('img');
+      img.src = src; img.alt = '';
+      a.insertBefore(img, a.firstChild);
+    }).catch(function(){});
+  });
+}
+var photoCache = {};
+function loadPhoto(pid) {
+  if (photoCache[pid]) return Promise.resolve(photoCache[pid]);
+  for (var i = 0; i < outbox.length; i++) {
+    if (outbox[i].photos && outbox[i].photos[pid]) return Promise.resolve(outbox[i].photos[pid]);
+  }
+  return dbRequest('GET', 'photos/' + pid).then(function(src) {
+    if (typeof src === 'string') photoCache[pid] = src;
+    return src;
+  });
+}
+function openPhoto(src) {
+  var o = $('photo-full');
+  o.querySelector('img').src = src;
+  o.classList.add('open');
+}
+
+function saveEdit() {
+  var r = findReading(editing.id);
+  if (!r) { closeEdit(); return; }
+  var customer = $('e-customer').value.trim();
+  if (!customer) { alert("Type who it's for."); return; }
+  var ts = new Date($('e-when').value).getTime();
+  if (!isFinite(ts)) { alert('Check the date and time.'); return; }
+  var updated = {
+    id: r.id, ts: ts, customer: customer, kind: editing.kind,
+    note: $('e-note').value.trim(), by: r.by, photos: r.photos || {},
+    editedBy: currentUser.email, editedAt: Date.now()
+  };
+  for (var i = 0; i < FIELDS.length; i++) {
+    var f = FIELDS[i], raw = $('e-' + f).value, n = num(raw);
+    if (raw.trim() && n === null) { alert('Check the ' + f + ' number.'); return; }
+    updated[f] = n;
+  }
+  closeEdit();
+  queue({ type: 'put', reading: updated, photos: {} });
+}
+function deleteEdit() {
+  var r = findReading(editing.id);
+  if (!r || !confirm('Delete this ' + r.kind + ' reading for ' + r.customer + '? This removes it for everyone.')) return;
+  closeEdit();
+  // Not uploaded yet: just drop it from this phone.
+  var hadPending = outbox.some(function(o){ return o.type === 'put' && o.reading.id === r.id; });
+  outbox = outbox.filter(function(o){ return !(o.type === 'put' && o.reading.id === r.id); });
+  if (serverReadings[r.id] || !hadPending) {
+    queue({ type: 'delete', id: r.id, photoIds: (serverReadings[r.id] || r).photos || {} });
+  } else {
+    idbSet(userKey('outbox'), outbox).then(renderAll);
+  }
+}
+
+// ===================== EXPORT =====================
+function exportCSV() {
+  var year = $('f-year').value, who = $('f-customer').value;
+  var jobs = buildJobs(allReadings());
+  var usedFor = {};
+  jobs.forEach(function(j){ if (j.end && j.used) usedFor[j.end.id] = j.used; });
+  var rows = [['Date', 'Time', 'Who', 'Start/End', 'Electric kWh', 'Gas ' + gasUnit(), 'Dryer hours', 'Batch',
+               'kWh used', 'Gas used', 'Hours run', 'Batches', 'Note', 'Saved by']];
+  allReadings().forEach(function(r) {
+    var d = new Date(r.ts);
+    if (year !== 'all' && d.getFullYear() !== Number(year)) return;
+    if (who && !sameName(r.customer, who)) return;
+    var u = usedFor[r.id] || {};
+    rows.push([
+      d.toLocaleDateString('en-CA'), d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      r.customer, r.kind, r.electric, r.gas, r.hours, r.batches,
+      u.electric, u.gas, u.hours, u.batches, r.note, r.by
+    ]);
+  });
+  var csv = rows.map(function(row) {
+    return row.map(function(v) {
+      v = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }).join(',');
+  }).join('\r\n');
+  var blob = new Blob([csv], { type: 'text/csv' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'grain-drying-' + (year === 'all' ? 'all' : year) + (who ? '-' + who.replace(/\W+/g, '-') : '') + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+}
+
+// ===================== SETTINGS =====================
+function renderSettings() {
+  var keyEl = $('s-key');
+  if (document.activeElement !== keyEl) keyEl.value = settings.claudeKey || '';
+  $('s-key-status').textContent = settings.claudeKey ? '✓ Key is set — photos will be read automatically.' : 'No key yet — numbers will have to be typed in.';
+  $('s-key-status').className = 'hint' + (settings.claudeKey ? '' : ' warn');
+  $('s-gas-unit').value = settings.gasUnit || '';
+  $('s-elec-mult').value = settings.elecMult || '';
+  $('s-gas-mult').value = settings.gasMult || '';
+}
+function saveSettings() {
+  var next = {
+    claudeKey: $('s-key').value.trim(),
+    gasUnit:   $('s-gas-unit').value.trim(),
+    elecMult:  num($('s-elec-mult').value) || '',
+    gasMult:   num($('s-gas-mult').value) || ''
+  };
+  $('s-status').textContent = 'Saving...';
+  dbRequest('PUT', 'settings', next).then(function() {
+    settings = next; writeCache(); renderAll();
+    $('s-status').textContent = '✓ Saved for everyone.';
+  }).catch(function(e) {
+    $('s-status').textContent = '⚠ ' + (navigator.onLine ? "Couldn't save: " + e.message : 'Needs signal to save settings.');
+  });
+}
+
+// ===================== NAV =====================
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
+  document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-section') === name); });
+  $('section-' + name).classList.add('active');
+  if (name === 'log') renderLog();
+  try { localStorage.setItem('gd_tab', name); } catch(e) {}
+  window.scrollTo(0, 0);
+}
+function renderAll() {
+  if (form) renderForm();
+  renderLog();
+  renderSettings();
+}
+
+(function init() {
+  var tab = null;
+  try { tab = localStorage.getItem('gd_tab'); } catch(e) {}
+  if (tab && $('section-' + tab)) showSection(tab);
+  startApp();
+})();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/drying/sw.js', { scope: '/drying/' }).catch(function(e){ console.log('SW error:', e); });
+  });
+}
+</script>
+</body>
+</html>
